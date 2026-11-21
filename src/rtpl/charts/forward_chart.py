@@ -14,7 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 from matplotlib.ticker import FuncFormatter
 
-from rtpl.engine.forward import CATEGORIES, CATEGORY_LABELS, TAX_FREE, PlanResult
+from rtpl.engine.forward import CATEGORIES, CATEGORY_LABELS, TAX_FREE, TAX_SOURCE_LABELS, TAX_SOURCES, PlanResult
 from rtpl.model.plan import ACCOUNT_KINDS
 from rtpl.theme import Palette
 
@@ -35,6 +35,10 @@ ACCOUNT_COLOR_KEY = {
     "cash": "principal",
 }
 ACCOUNT_HATCH = {"401k": "....", "roth_401k": "....", "hsa": "xxxx", "taxable": "////", "cash": "\\\\\\\\"}
+# Taxes by source use the marginal graph's layer colors, so a tax looks the
+# same on both pages. IRMAA takes the IRMAA line color from the income graph.
+TAX_COLOR_KEY = {"ordinary": "ordinary", "ltcg": "cg", "niit": "niit", "state": "state", "state_gains": "state_cg"}
+TAX_HATCH = {"state_gains": "////", "irmaa": "...."}
 ACCOUNT_ORDER = ("taxable", "cash", "traditional_ira", "401k", "inherited_ira", "roth_ira", "roth_401k", "hsa")
 
 
@@ -315,3 +319,67 @@ def render_balances(
                  color=palette.text_primary, fontsize=11, loc="left")
     ax.set_ylabel("Balance", color=palette.text_secondary)
     _legend_and_notes(fig, handles[::-1], list(result.notes), palette, ncol=4, right=0.97)
+
+
+def tax_color(key: str, palette: Palette) -> str:
+    if key == "irmaa":
+        return palette.lines.get("irmaa", palette.irmaa)
+    return palette.layers.get(TAX_COLOR_KEY[key], palette.text_secondary)
+
+
+def render_taxes(
+    fig: Figure,
+    result: PlanResult,
+    palette: Palette,
+    *,
+    todays_dollars: bool = False,
+    **_kw,
+) -> None:
+    """Stacked bars of each year's taxes by source: federal ordinary income,
+    capital gains and NIIT, state, and IRMAA surcharges."""
+    fig.clear()
+    fig.set_facecolor(palette.surface)
+    ax = fig.add_subplot(111)
+    _style(ax, palette)
+    years = [yr.year for yr in result.years]
+    scale = {yr.year: (1 / result.deflator(yr.year) if todays_dollars else 1.0) for yr in result.years}
+    by_year = {yr.year: yr.tax_by_source() for yr in result.years}
+    bottom = {y: 0.0 for y in years}
+    handles = []
+    totals: dict[str, float] = {}
+    for key in TAX_SOURCES:
+        heights = [max(0.0, by_year[y][key]) * scale[y] for y in years]
+        if not any(h > 0.5 for h in heights):
+            continue
+        totals[key] = sum(heights)
+        color = tax_color(key, palette)
+        hatch = TAX_HATCH.get(key)
+        label = TAX_SOURCE_LABELS[key]
+        ax.bar(years, heights, bottom=[bottom[y] for y in years], width=0.78, color=color,
+               edgecolor=palette.surface, linewidth=0.6, label=label)
+        if hatch:
+            ax.bar(years, heights, bottom=[bottom[y] for y in years], width=0.78, color="none",
+                   edgecolor=_mix(color, palette.text_primary if palette.mode == "light" else palette.surface, 0.45),
+                   linewidth=0, hatch=hatch)
+        handles.append(Patch(facecolor=color, hatch=hatch,
+                             edgecolor=_mix(color, palette.text_primary, 0.45) if hatch else color, label=label))
+        for y, h in zip(years, heights):
+            bottom[y] += h
+    ax.set_ylim(0, max(max(bottom.values(), default=0), 10_000) * 1.08)
+    _year_axis(ax, result, palette)
+    dollars = f"today's ({result.plan.start_year}) dollars" if todays_dollars else "future (nominal) dollars"
+    ax.set_title(_escape(f"Taxes by source each year\n{_plan_label(result.plan)} · {dollars}"),
+                 color=palette.text_primary, fontsize=11, loc="left")
+    ax.set_ylabel("Tax", color=palette.text_secondary)
+    notes = []
+    if totals:
+        whole = sum(totals.values())
+        short = {"ordinary": "federal ordinary", "ltcg": "federal capital gains", "niit": "NIIT",
+                 "state": "state", "state_gains": "state capital gains", "irmaa": "IRMAA"}
+        parts = ", ".join(f"{short[k]} {_money(v)}" for k, v in totals.items())
+        notes.append(f"Lifetime total {_money(whole)}: {parts}." if len(totals) > 1
+                     else f"Lifetime total {_money(whole)}.")
+    if totals.get("irmaa"):
+        notes.append("IRMAA surcharges are Medicare Part B and D premiums set by income two years earlier.")
+    notes.append("FICA payroll taxes and local income taxes are not included.")
+    _legend_and_notes(fig, handles[::-1], notes, palette, ncol=3, right=0.97)

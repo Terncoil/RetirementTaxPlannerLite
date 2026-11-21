@@ -2,7 +2,7 @@
 
 Example::
 
-    rtpl-plan examples/plans/couple_conversions_inherited.json -o income.png --balances balances.png
+    rtpl-plan examples/plans/couple_conversions_inherited.json -o income.png --balances balances.png --taxes taxes.png
     rtpl-plan plan.json -o income.svg --detail --todays-dollars --csv years.csv
 """
 
@@ -22,6 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("plan", help="Plan JSON file")
     ap.add_argument("-o", "--output", help="Income graph (.png, .svg or .pdf)")
     ap.add_argument("--balances", help="Also draw account balances to this file")
+    ap.add_argument("--taxes", help="Also draw taxes by source to this file")
     ap.add_argument("--csv", help="Write the year-by-year table to this CSV file")
     ap.add_argument("--detail", action="store_true", help="Show each income source and account separately")
     ap.add_argument("--todays-dollars", action="store_true", help="Show amounts in the plan's first-year dollars")
@@ -41,7 +42,7 @@ def main(argv: list[str] | None = None) -> int:
     matplotlib.use("Agg")
     from matplotlib.figure import Figure
 
-    from rtpl.charts.forward_chart import render_balances, render_income
+    from rtpl.charts.forward_chart import render_balances, render_income, render_taxes
     from rtpl.engine.forward import (
         TABLE_COLUMN_KEYS,
         default_line_visibility,
@@ -68,6 +69,10 @@ def main(argv: list[str] | None = None) -> int:
         fig = Figure(figsize=(12, 6.5), dpi=150)
         render_balances(fig, result, palette, detail=args.detail, todays_dollars=args.todays_dollars)
         fig.savefig(args.balances, facecolor=fig.get_facecolor())
+    if args.taxes:
+        fig = Figure(figsize=(12, 6.5), dpi=150)
+        render_taxes(fig, result, palette, todays_dollars=args.todays_dollars)
+        fig.savefig(args.taxes, facecolor=fig.get_facecolor())
     columns = list(TABLE_COLUMN_KEYS) if args.all_columns else plan.table_columns
     header, rows = year_table(result, todays_dollars=args.todays_dollars, columns=columns, detail=args.detail)
     if args.csv:
@@ -75,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             w = csv.writer(fh)
             w.writerow(header)
             w.writerows(rows)
-    if not (args.output or args.balances or args.csv):
+    if not (args.output or args.balances or args.taxes or args.csv):
         for row in rows:
             print(" | ".join(row))
     return 0

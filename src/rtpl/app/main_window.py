@@ -49,7 +49,7 @@ from rtpl.app.plan_editor import PlanEditor
 from rtpl.app.plan_view import PlanView
 from rtpl.app.profile_form import ProfileForm, money_box
 from rtpl.app.side_panel import PanelHost, PanelTabs, SidePanel
-from rtpl.charts.forward_chart import render_balances, render_income
+from rtpl.charts.forward_chart import render_balances, render_income, render_taxes
 from rtpl.charts.marginal_chart import render_marginal
 from rtpl.engine.marginal import (
     ANNOTATIONS,
@@ -974,6 +974,7 @@ class MainWindow(QMainWindow):
             sections.append(Section("Forward plan", rows))
             charts.append(ReportChart("Income and brackets",
                                       lambda fig: render_income(fig, result, plan_vis, palette, **kw)))
+            charts.append(ReportChart("Taxes by source", lambda fig: render_taxes(fig, result, palette, **kw)))
             charts.append(ReportChart("Balances", lambda fig: render_balances(fig, result, palette, **kw)))
         return title, sections, charts
 

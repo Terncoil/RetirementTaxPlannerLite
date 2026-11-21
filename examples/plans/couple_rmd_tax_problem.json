@@ -1,0 +1,101 @@
+{
+  "schema_version": 2,
+  "profile": {
+    "name": "Couple at 62 with a growing RMD tax problem",
+    "year": 2026,
+    "filing_status": "mfj",
+    "state": "WI",
+    "inflation": 0.025,
+    "people": [
+      {
+        "name": "Pat",
+        "birth_year": 1964,
+        "life_expectancy": 87
+      },
+      {
+        "name": "Lee",
+        "birth_year": 1964,
+        "life_expectancy": 94
+      }
+    ],
+    "household": {
+      "has_taxable_brokerage": true
+    }
+  },
+  "people": [
+    {
+      "social_security": {
+        "fra_benefit": 40000,
+        "claim_age": 62
+      }
+    },
+    {
+      "social_security": {
+        "fra_benefit": 28000,
+        "claim_age": 62
+      }
+    }
+  ],
+  "accounts": [
+    {
+      "id": "pat_ira",
+      "kind": "traditional_ira",
+      "owner": 0,
+      "balance": 1100000
+    },
+    {
+      "id": "lee_ira",
+      "kind": "traditional_ira",
+      "owner": 1,
+      "balance": 700000
+    },
+    {
+      "id": "lee_roth",
+      "kind": "roth_ira",
+      "owner": 1,
+      "balance": 200000
+    },
+    {
+      "id": "brokerage",
+      "kind": "taxable",
+      "owner": null,
+      "balance": 650000,
+      "cost_basis": 325000,
+      "qualified_dividend_yield": 0.015,
+      "interest_yield": 0.002,
+      "cap_gain_distribution_yield": 0.003
+    }
+  ],
+  "incomes": [],
+  "rules": [
+    {
+      "kind": "withdrawal",
+      "account": "pat_ira",
+      "start": {
+        "year": 2026
+      },
+      "end": {
+        "age": 74,
+        "person": 0
+      },
+      "mode": "fixed",
+      "amount": 45000,
+      "note": "Take some IRA money each year before RMDs start"
+    }
+  ],
+  "assumptions": {
+    "return_rate": 0.08,
+    "cash_return": 0.03,
+    "spending": 132000,
+    "prior_magi": {
+      "2024": 150000,
+      "2025": 150000
+    },
+    "spending_order": [
+      "cash",
+      "taxable",
+      "roth",
+      "traditional"
+    ]
+  }
+}

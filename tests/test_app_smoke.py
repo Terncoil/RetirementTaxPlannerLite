@@ -122,6 +122,14 @@ def test_forward_plan_page(window):
     assert view.visibility()["bracket:0.22"] is False
     view.detail.setChecked(True)
     view.todays.setChecked(True)
+    # Each chart tab exports its own figure.
+    assert [view.tabs.tabText(i) for i in range(view.tabs.count())] == [
+        "&Income and brackets", "Tax&es by source", "&Balances", "&Year table"]
+    for canvas, fig in ((view.income_canvas, view.income_fig), (view.tax_canvas, view.tax_fig),
+                        (view.bal_canvas, view.bal_fig)):
+        view.tabs.setCurrentWidget(canvas)
+        assert view.current_figure() is fig
+    assert "Taxes by source" in view.tax_fig.axes[0].get_title(loc="left")
     window.new_plan()
     assert view.plan is not None and view.result is not None
 
@@ -148,6 +156,7 @@ def test_empty_plan_page_uses_theme_background(window):
     view.set_palette(dark)
     assert to_hex(view.income_fig.get_facecolor()) == to_hex(dark.surface)
     assert to_hex(view.bal_fig.get_facecolor()) == to_hex(dark.surface)
+    assert to_hex(view.tax_fig.get_facecolor()) == to_hex(dark.surface)
 
 
 def test_window_fits_small_screens(window):
@@ -337,10 +346,10 @@ def test_export_report_with_and_without_plan(window, tmp_path):
     window.load_plan(Plan.load(plan_path), plan_path)
     window.recompute()
     title, sections, charts = window.report_contents()
-    assert [c.title for c in charts] == ["Marginal tax graph", "Income and brackets", "Balances"]
+    assert [c.title for c in charts] == ["Marginal tax graph", "Income and brackets", "Taxes by source", "Balances"]
     assert sections[-1].heading == "Forward plan"
     out = tmp_path / "plan.pdf"
-    assert write_report(out, title, sections, charts) == 4
+    assert write_report(out, title, sections, charts) == 5
 
 
 def test_light_mode_uses_light_widget_colors_whatever_the_system_scheme(window):

@@ -104,6 +104,21 @@ CATEGORY_LABELS = {
     "qcd": "Qualified charitable distributions (to charity, not taxed)",
 }
 
+# Taxes paid each year, in stack order from the bottom, for the taxes by
+# source graph. State tax is split into the state's separate capital gains
+# tax (such as Washington's) and the rest. IRMAA surcharges are Medicare
+# premiums rather than tax, so they go on top. FICA and local income taxes
+# are not modeled.
+TAX_SOURCES = ("ordinary", "ltcg", "niit", "state", "state_gains", "irmaa")
+TAX_SOURCE_LABELS = {
+    "ordinary": "Federal ordinary income tax",
+    "ltcg": "Federal capital gains tax",
+    "niit": "Net investment income tax (NIIT)",
+    "state": "State income tax",
+    "state_gains": "State capital gains tax",
+    "irmaa": "Medicare IRMAA surcharges",
+}
+
 
 @dataclass(frozen=True)
 class Source:
@@ -158,6 +173,18 @@ class YearResult:
         for s in self.sources:
             out[s.category] += s.amount
         return out
+
+    def tax_by_source(self) -> dict[str, float]:
+        """The year's taxes and IRMAA surcharges by source (see TAX_SOURCES)."""
+        t = self.tax
+        return {
+            "ordinary": t.ordinary_tax,
+            "ltcg": t.capital_gains_tax,
+            "niit": t.niit,
+            "state": t.state_tax - t.state_gains_tax,
+            "state_gains": t.state_gains_tax,
+            "irmaa": self.irmaa_surcharge,
+        }
 
     @property
     def taxable_bar(self) -> float:
@@ -1397,6 +1424,10 @@ TABLE_COLUMNS: tuple[TableColumn, ...] = (
                 "(an IRA withdrawal or Roth conversion), as a rate. Shows the\n"
                 "years where Social Security or the gains \"bump zone\" raise it."),
     TableColumn("federal_tax", "Federal tax", True),
+    TableColumn("federal_by_type", "Federal tax by type (ordinary / capital gains / NIIT)", False,
+                "Federal tax split as on the Taxes by source graph:\n"
+                "tax on ordinary income, on gains and qualified dividends,\n"
+                "and the 3.8% net investment income tax"),
     TableColumn("state_tax", "State tax", True),
     TableColumn("irmaa", "IRMAA surcharge", True),
     TableColumn("total_tax", "Total tax", False, "Federal and state tax plus IRMAA surcharges"),
@@ -1507,6 +1538,9 @@ def table_data(result: PlanResult, *, todays_dollars: bool = False, columns: lis
             cols.append(("Marginal rate", c.tip, True, lambda yr: f"{100 * yr.marginal_rate:.1f}%"))
         elif k == "federal_tax":
             money_col("Federal tax", "", lambda yr: yr.tax.federal_tax)
+        elif k == "federal_by_type":
+            for key, label in (("ordinary", "Ordinary income tax"), ("ltcg", "Capital gains tax"), ("niit", "NIIT")):
+                money_col(label, c.tip, lambda yr, key=key: yr.tax_by_source()[key])
         elif k == "state_tax":
             money_col("State tax", "", lambda yr: yr.tax.state_tax)
         elif k == "irmaa":

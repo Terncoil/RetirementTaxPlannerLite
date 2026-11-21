@@ -98,7 +98,7 @@ totals update as you type. **File > Save** saves the plan. From the
 command line:
 
 ```bash
-rtpl-plan plan.json -o income.png --balances balances.png --csv years.csv
+rtpl-plan plan.json -o income.png --balances balances.png --taxes taxes.png --csv years.csv
 rtpl-plan plan.json -o income.svg --detail --todays-dollars --line bracket:0.32
 ```
 

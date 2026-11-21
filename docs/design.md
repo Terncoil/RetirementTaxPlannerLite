@@ -492,6 +492,18 @@ Suggested lines: the brackets the bars reach plus the next one up (not
 near if anyone will be on Medicare, and ACA if the household buys
 marketplace coverage.
 
+**Taxes by source.** Each year's taxes as stacked bars, bottom to top:
+federal tax on ordinary income, federal tax on gains and qualified
+dividends, NIIT, state income tax, the state's own capital gains tax (such
+as Washington's) and Medicare IRMAA surcharges (premiums rather than tax,
+so on top). Colors match the marginal graph's layers, and IRMAA takes the
+income graph's IRMAA line color. It follows the today's-dollars toggle,
+and the notes give lifetime totals by source. FICA payroll taxes and local
+income taxes are not modeled, so they are not shown.
+`examples/plans/couple_rmd_tax_problem.json` shows the typical shape: a
+low-tax stretch, a jump when RMDs start at 75, and another when the
+survivor files single.
+
 **Balances.** Year-end balances by account type (or by account), colored
 to match the income each feeds. **Year table.** For screen readers and
 copying. The suggested columns are ages, filing status, income by

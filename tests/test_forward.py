@@ -316,6 +316,50 @@ def test_example_plan_runs_and_round_trips(lib, tmp_path):
     assert again.to_dict() == plan.to_dict()
 
 
+def test_taxes_by_source_add_up_and_chart(lib):
+    """The taxes graph's sources add up to the year table's total tax, and
+    the RMD example shows the low-tax stretch, the RMD jump at 75 and the
+    jump when the survivor files single."""
+    from matplotlib.figure import Figure
+
+    from rtpl.charts.forward_chart import render_taxes
+    from rtpl.engine.forward import TAX_SOURCES, table_data
+    from rtpl.theme import Theme
+
+    res = run_plan(Plan.load(Path("examples/plans/couple_rmd_tax_problem.json")), lib)
+    assert all(y.shortfall == 0 for y in res.years)
+    for y in res.years:
+        parts = y.tax_by_source()
+        assert list(parts) == list(TAX_SOURCES)
+        assert sum(parts.values()) == pytest.approx(y.tax.total_tax + y.irmaa_surcharge)
+    total = {y.year: y.tax.total_tax + y.irmaa_surcharge for y in res.years}
+    assert max(total[y] for y in range(2026, 2039)) < 10_000 < 2 * 10_000 < total[2039]
+    assert total[2052] > 1.15 * total[2051]  # the survivor files single
+    assert any(y.irmaa_surcharge > 0 for y in res.years)
+
+    t = table_data(res, columns=["federal_tax", "federal_by_type"])
+    assert t.header == ["Year", "Federal tax", "Ordinary income tax", "Capital gains tax", "NIIT"]
+    for row in t.rows:
+        fed, *parts = (int(v.replace(",", "")) for v in row[1:])
+        assert abs(fed - sum(parts)) <= 2
+
+    palette = Theme.load("default").palette("dark")
+    fig = Figure()
+    render_taxes(fig, res, palette, todays_dollars=True)
+    ax = fig.axes[0]
+    assert "today's (2026) dollars" in ax.get_title(loc="left")
+    labels = [t.get_text() for t in fig.legends[0].get_texts()]
+    assert "Federal ordinary income tax" in labels and "Medicare IRMAA surcharges" in labels
+    assert "State capital gains tax" not in labels  # Wisconsin has none of its own
+    # The top of each bar is that year's total in today's dollars.
+    tops: dict[float, float] = {}
+    for bar in ax.patches:
+        x = round(bar.get_x() + bar.get_width() / 2)
+        tops[x] = max(tops.get(x, 0.0), bar.get_y() + bar.get_height())
+    for y in res.years:
+        assert tops[y.year] == pytest.approx(total[y.year] / res.deflator(y.year), rel=1e-6)
+
+
 def test_plan_validation():
     plan = Plan(profile=single(), accounts=[Account(id="x", kind="bogus")],
                 rules=[Rule(kind="roth_conversion", account="nope", start=When(year=2026), mode="fill")])
@@ -331,9 +375,10 @@ def test_plan_cli(tmp_path):
     from rtpl.plan_cli import main
 
     out, bal, csv_path = tmp_path / "i.png", tmp_path / "b.svg", tmp_path / "y.csv"
-    assert main([str(EXAMPLE), "-o", str(out), "--balances", str(bal), "--csv", str(csv_path),
+    taxes = tmp_path / "t.png"
+    assert main([str(EXAMPLE), "-o", str(out), "--balances", str(bal), "--taxes", str(taxes), "--csv", str(csv_path),
                  "--detail", "--todays-dollars", "--line", "bracket:0.32"]) == 0
-    assert out.stat().st_size > 10_000 and bal.stat().st_size > 10_000
+    assert out.stat().st_size > 10_000 and bal.stat().st_size > 10_000 and taxes.stat().st_size > 10_000
     assert csv_path.read_text(encoding="utf-8").startswith("Year,")
 
 

@@ -1,4 +1,5 @@
-"""Forward plan page: income-by-source graph, balances graph and a year table.
+"""Forward plan page: income-by-source graph, taxes-by-source graph,
+balances graph and a year table.
 
 The plan's items are edited on the Plan items tab of the left panel; the
 baseline (people, filing status, state) is the profile on its Baseline
@@ -33,7 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from rtpl.app import TIP_WIDTH
-from rtpl.charts.forward_chart import line_short_label, render_balances, render_income
+from rtpl.charts.forward_chart import line_short_label, render_balances, render_income, render_taxes
 from rtpl.engine.forward import (
     DEFAULT_TABLE_COLUMNS,
     TABLE_COLUMNS,
@@ -107,6 +108,11 @@ class PlanView(QWidget):
         self.income_canvas.setAccessibleName("Income by source and tax thresholds chart")
         self.income_canvas.setAccessibleDescription("The Year table tab lists the same information as text.")
         self.tabs.addTab(self.income_canvas, "&Income and brackets")
+        self.tax_fig = Figure(figsize=(9, 6), dpi=100)
+        self.tax_canvas = FigureCanvasQTAgg(self.tax_fig)
+        self.tax_canvas.setAccessibleName("Taxes by source chart")
+        self.tax_canvas.setAccessibleDescription("The Year table tab lists the same taxes as text.")
+        self.tabs.addTab(self.tax_canvas, "Tax&es by source")
         self.bal_fig = Figure(figsize=(9, 6), dpi=100)
         self.bal_canvas = FigureCanvasQTAgg(self.bal_fig)
         self.bal_canvas.setAccessibleName("Account balances chart")
@@ -164,7 +170,8 @@ class PlanView(QWidget):
 
     def _paint_empty(self) -> None:
         """Blank charts in the theme's background, so dark mode has no white page."""
-        for fig, canvas in ((self.income_fig, self.income_canvas), (self.bal_fig, self.bal_canvas)):
+        for fig, canvas in ((self.income_fig, self.income_canvas), (self.tax_fig, self.tax_canvas),
+                            (self.bal_fig, self.bal_canvas)):
             fig.clear()
             if self.palette is not None:
                 fig.set_facecolor(self.palette.surface)
@@ -318,6 +325,8 @@ class PlanView(QWidget):
         kw = dict(detail=self.detail.isChecked(), todays_dollars=self.todays.isChecked())
         render_income(self.income_fig, self.result, vis, self.palette, **kw)
         self.income_canvas.draw_idle()
+        render_taxes(self.tax_fig, self.result, self.palette, **kw)
+        self.tax_canvas.draw_idle()
         render_balances(self.bal_fig, self.result, self.palette, **kw)
         self.bal_canvas.draw_idle()
         data = table_data(self.result, todays_dollars=self.todays.isChecked(), columns=self.table_columns(),
@@ -364,4 +373,9 @@ class PlanView(QWidget):
         return super().eventFilter(obj, event)
 
     def current_figure(self) -> Figure:
-        return self.bal_fig if self.tabs.currentIndex() == 1 else self.income_fig
+        page = self.tabs.currentWidget()
+        if page is self.bal_canvas:
+            return self.bal_fig
+        if page is self.tax_canvas:
+            return self.tax_fig
+        return self.income_fig
