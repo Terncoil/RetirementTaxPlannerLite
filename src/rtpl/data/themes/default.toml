@@ -3,8 +3,9 @@
 #
 # The layer colors are a colorblind-checked categorical set, stepped
 # separately for light and dark backgrounds. Stack order (bottom to top) is
-# ordinary, ss, cg, senior, niit, state, state_cg, and the colors are assigned in that
-# order so neighbouring bands stay distinguishable.
+# ordinary, ss, cg, senior, edu, niit, state, state_cg, ptc, and the colors are
+# assigned in that order so neighbouring bands stay distinguishable. nonref
+# is drawn below 0%.
 
 name = "Default"
 
@@ -28,6 +29,9 @@ senior = "#eda100"
 niit = "#e87ba4"
 state = "#008300"
 state_cg = "#6250d6"
+edu = "#8c564b"
+ptc = "#b03fbf"
+nonref = "#e6a1a1"
 
 [dark]
 surface = "#1a1a19"
@@ -46,6 +50,9 @@ senior = "#c98500"
 niit = "#d55181"
 state = "#0ca30c"
 state_cg = "#9085e9"
+edu = "#b07a6e"
+ptc = "#c66bd3"
+nonref = "#d98c8c"
 
 # Forward-looking graph: income categories, in stack order from the bottom.
 # Ordinary income takes the categorical slots in order; gains and the

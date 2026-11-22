@@ -61,6 +61,11 @@ the forward-looking plan and the command-line exporter.
    Security, wages, pension and IRA withdrawals; household interest,
    dividends, gains, other income, adjustments, itemized deductions, and
    switches for *has a taxable brokerage account* and *buys ACA coverage*.
+   For the ACA premium tax credit, each person's monthly benchmark Silver
+   premium and the premium of the plan they'd buy, plus the plan's metal
+   tier; for education credits, the number of college students (American
+   Opportunity credit), expenses per student, Lifetime Learning expenses,
+   and the last year the forward plan claims them.
 2. **Tax law (data files).** One TOML file per federal tax year, and one per
    state. See below.
 3. **The plan (forward graph).** Accounts, income streams, Social Security
@@ -72,8 +77,12 @@ the forward-looking plan and the command-line exporter.
 `data/federal/<year>.toml` (2020 through 2027) holds brackets, standard deductions, the
 additional 65+ deduction, the OBBBA senior deduction (amount, 6% phase-out,
 first and last year), capital gains bands, NIIT, Social Security
-thresholds, IRMAA tiers for that premium year, and ACA poverty-line
-reference points. A `[policy]` table holds switches:
+thresholds, IRMAA tiers for that premium year, ACA poverty-line
+reference points and the premium tax credit's applicable percentage table
+(`[aca] applicable_percentage`: band start as a multiple of the poverty
+line, initial and final share of income), and the education credits
+(`[education_credits]`: AOTC and Lifetime Learning amounts and MAGI
+phase-outs, fixed in statute). A `[policy]` table holds switches:
 
 * `personal_exemption` (0 under TCJA, kept by OBBBA)
 * `senior_deduction` (on for 2025–2028)
@@ -110,8 +119,10 @@ historical state tax needs a year-aware state loader first.
 year by `federal/projection.toml`: indexed amounts (brackets, standard
 deductions, capital gains bands, IRMAA thresholds and premiums, poverty
 line) grow with inflation and round down like the IRS does; statutory
-amounts (NIIT and Social Security thresholds, the senior deduction) stay
-fixed; `[sunsets]` turns policies off after their last year. Projected law
+amounts (NIIT and Social Security thresholds, the senior deduction, the
+education credits) stay fixed, and so does the newest ACA applicable
+percentage table (the IRS indexes it to premium growth, which isn't
+projected); `[sunsets]` turns policies off after their last year. Projected law
 is labelled as projected on the chart.
 
 ## The marginal graph
@@ -134,9 +145,38 @@ recomputation, so the layers always sum exactly to the real change:
 | Social Security Taxation Phase-In | extra federal income tax (ordinary and gains) from newly taxable SS, senior deduction frozen |
 | Capital Gains and Qualified Dividends Tax | gains tax change with taxable SS and the senior deduction frozen: the 0/15/20% rate on added gains, or gains pushed out of the 0% band by added ordinary income |
 | Enhanced Senior Deduction Phase-Out | the remaining federal income tax change, including gains it pushes out of the 0% band |
+| Education Credit Phase-Out | education credits lost to the MAGI phase-out, nonrefundable (as far as there was tax to use it) and refundable together |
 | Net Investment Income Tax | change in NIIT |
 | State Tax (XX) | change in state income tax, labelled with the state code |
 | State CG&QD Tax (XX) | change in tax under the state's own capital gains rules: Washington's gains tax, Montana's gains rates, Hawaii's gains rate cap (states that tax gains as regular income show them in State Tax) |
+| ACA Premium Tax Credit Phase-Out | premium tax credit lost on each extra dollar of ACA MAGI, leaving out the jumps at 100% and 400% FPL (those are lines) |
+| Nonrefundable Credit Absorbing Tax (drawn below 0%) | with the credit held at its starting amount, the extra tax it now cancels: negative, so with income tax below the credit the ordinary layer shows the bracket rate and this cancels it |
+
+**Credits.** Education credits follow Form 8863: the American Opportunity
+credit is 100% of the first $2,000 and 25% of the next $2,000 of each
+student's expenses, 40% refundable; the Lifetime Learning credit is 20% of
+up to $10,000 a return, nonrefundable. Both phase out over MAGI $80,000 to
+$90,000 ($160,000 to $180,000 joint; married filing separately can't
+claim them). The nonrefundable part can only offset regular income tax
+(not NIIT), so a household whose gains sit in the 0% band can't use it
+until added income creates tax. The chart then goes below 0%: the
+ordinary layer shows the bracket rate and the credit layer cancels it, so
+the total stays at 0% until the credit is used up. Positive layers stack
+up from 0% and negative ones down from it; the total line is their sum.
+
+**The premium tax credit** is the yearly benchmark premium (the
+second-lowest-cost Silver plan, summed over the people on marketplace
+coverage and not on Medicare) less the applicable percentage of ACA MAGI,
+but no more than the premium of the plans bought (so a cheaper Bronze plan
+can be fully covered at low incomes, with no phase-out until the credit
+falls below its price). There's no credit below 100% FPL, above 400% FPL
+without the enhanced credits, or for married filing separately. The
+expected share of income rises in a straight line inside each band, so
+this layer's rate drifts rather than stepping; the data table starts a
+new row when it moves a whole point. It is a premium subsidy, not a tax,
+but each extra dollar of income costs it the same way, so it counts in
+the total; it is kept out of federal tax everywhere else. The whole year
+counts: someone turning 65 is taken off at the start of that year.
 
 Knock-on effects are charged to their cause. Example: a married couple,
 both over 65, adds long-term gains while the senior deduction is phasing
@@ -161,9 +201,10 @@ lines rather than part of the rate:
   A *IRMAA brackets* option switches to this year's published brackets
   for comparison with tools that show those.
 * **ACA.** Lines at 138% FPL (Medicaid in expansion states), 250% (cost
-  sharing reductions) and, when enhanced credits are off, the 400% subsidy
-  cliff, using ACA MAGI (AGI + tax-exempt interest + untaxed Social
-  Security).
+  sharing reductions, only for a Silver plan) and, when enhanced credits
+  are off, the 400% subsidy cliff, using ACA MAGI (AGI + tax-exempt
+  interest + untaxed Social Security). With benchmark premiums entered,
+  the cliff line is labelled with the credit lost there in one dollar.
 
 **Default visibility** (every item is a checkbox the user can override;
 *Reset to suggested* undoes overrides):
@@ -171,7 +212,7 @@ lines rather than part of the rate:
 | Item | Shown by default when |
 |---|---|
 | Ordinary income tax | always |
-| SS phase-in, senior phase-out, NIIT | the layer is non-zero somewhere on the graph |
+| SS phase-in, senior phase-out, education credit phase-out, ACA premium tax credit phase-out, nonrefundable credit, NIIT | the layer is non-zero somewhere on the graph |
 | Capital gains / QD | brokerage account, existing gains or dividends, or a gains/dividends source |
 | State | a state with an income tax is entered |
 | IRMAA | someone is on Medicare by the premium year (age 63+ now, or Part B enrolled) |
@@ -196,12 +237,14 @@ values into the theme file.
 
 ## Not modelled yet
 
-Credits (child, saver's, elderly), AMT, QBI, the 0.9% additional Medicare
+Credits other than education (child, saver's, elderly), detailed itemized
+deductions (SALT cap and phase-out, medical floor, charitable rules; issue
+#27), AMT, QBI, the 0.9% additional Medicare
 tax, self-employment tax, local income taxes, most state credits, and the
 state rules each state file lists under `notes` (income phase-outs of
 state exemptions, cliff-style pension exclusions, special capital gains
-rates), ACA premium tax credit dollar
-amounts (only the thresholds are drawn), the qualifying surviving spouse
+rates), the premium tax credit's repayment rules for
+advance payments (the credit is worked out on the year's actual MAGI), the qualifying surviving spouse
 filing status (issue #2).
 
 ## Forward-looking plan
@@ -442,8 +485,19 @@ means it stops applying once the plan starts in a later year.
 6. **Tax.** `compute_tax()` with that year's law (projected past the newest
    data file), the year's filing status (joint through the year of death,
    then single), and inflation-indexed adjustments and itemized deductions.
-7. **Cash flow.** Income minus spending, tax, IRMAA surcharges and HSA
-   contributions; after
+   Education credits from the baseline are claimed from the first year
+   through its *Claimed through* year (expenses grow with inflation), and
+   lower federal tax; the year table's *Education credits* column shows
+   them, and the Taxes by source graph takes them off federal ordinary
+   income tax first.
+7. **Cash flow.** Income minus spending, tax, IRMAA surcharges, net ACA
+   premiums and HSA contributions. **ACA premiums:** each person's
+   baseline benchmark and plan premiums grow at the *ACA premium growth*
+   assumption (default 5% a year, usually above inflation) until they are
+   on Medicare; the premium tax credit is worked out on that year's own
+   ACA MAGI, and the plan pays the premium less the credit, so leave
+   marketplace premiums out of spending. The year table shows the
+   premiums, the credit and the net cost. After
    the first death a couple's spending is the survivor's share. A surplus
    goes into the taxable account (or cash); a deficit is taken from the
    account types in the spending order (by default cash, then the taxable

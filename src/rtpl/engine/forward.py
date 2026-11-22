@@ -175,12 +175,21 @@ class YearResult:
         return out
 
     def tax_by_source(self) -> dict[str, float]:
-        """The year's taxes and IRMAA surcharges by source (see TAX_SOURCES)."""
+        """The year's taxes and IRMAA surcharges by source (see TAX_SOURCES).
+
+        Federal tax is after credits: they come off the ordinary income tax
+        first, then capital gains tax, then NIIT (a refundable credit larger
+        than all three is left out, so no source goes below zero).
+        """
         t = self.tax
+        left = t.credits
+        fed = {}
+        for key, amount in (("ordinary", t.ordinary_tax), ("ltcg", t.capital_gains_tax), ("niit", t.niit)):
+            used = min(left, max(0.0, amount))
+            fed[key] = amount - used
+            left -= used
         return {
-            "ordinary": t.ordinary_tax,
-            "ltcg": t.capital_gains_tax,
-            "niit": t.niit,
+            **fed,
             "state": t.state_tax - t.state_gains_tax,
             "state_gains": t.state_gains_tax,
             "irmaa": self.irmaa_surcharge,
@@ -599,6 +608,7 @@ class PlanEngine:
     def build_profile(self, year: int, y: _Year, filing_status: str) -> Profile:
         base = self.profile
         infl = (1 + self.plan.inflation) ** (year - self.plan.start_year)
+        health = (1 + self.plan.assumptions.health_premium_growth) ** (year - self.plan.start_year)
         people = []
         for i in self.living(year):
             src = base.people[i]
@@ -608,6 +618,8 @@ class PlanEngine:
                     birth_year=src.birth_year,
                     medicare_part_b=src.medicare_part_b,
                     blind=src.blind,
+                    aca_benchmark_premium=src.aca_benchmark_premium * health,
+                    aca_plan_premium=src.aca_plan_premium * health,
                     social_security=y.ss.get(i, 0.0),
                     wages=y.wages.get(i, 0.0),
                     pension=y.pension.get(i, 0.0),
@@ -615,6 +627,9 @@ class PlanEngine:
                 )
             )
         h = base.household
+        # Education credits are claimed from the plan's first year through
+        # the year the baseline gives (the first year only if none).
+        studying = year <= (h.education_last_year or base.year)
         household = Household(
             taxable_interest=y.interest,
             tax_exempt_interest=y.tax_exempt,
@@ -627,7 +642,12 @@ class PlanEngine:
             itemized_deductions=h.itemized_deductions * infl,
             has_taxable_brokerage=h.has_taxable_brokerage,
             aca_marketplace=h.aca_marketplace,
+            aca_plan_tier=h.aca_plan_tier,
             household_size=h.household_size if len(people) == len(base.people) else None,
+            aotc_students=h.aotc_students if studying else 0,
+            aotc_expenses_per_student=h.aotc_expenses_per_student * infl,
+            llc_expenses=h.llc_expenses * infl if studying else 0.0,
+            education_last_year=h.education_last_year,
         )
         return Profile(year=year, filing_status=filing_status, state=base.state, people=people,
                        household=household, name=base.name, inflation=self.plan.inflation)
@@ -904,7 +924,7 @@ class PlanEngine:
                 self._add_cover_income(y_try, sale_plan, by_id, living)
                 prof = self.build_profile(year, y_try, fs)
                 tax = compute_tax(prof, law, self.state_law)
-                net = inflow - (spending + tax.total_tax + surcharge + y.hsa_deduction)
+                net = inflow - (spending + tax.total_tax + surcharge + y.hsa_deduction + tax.aca_net_premium)
                 new_plan, short = self._cover_deficit(-net, accounts, bal, withdrawn, basis)
                 new_taxed = _taxed_cover(new_plan, by_id)
                 done = all(abs(a - b) < 1.0 for a, b in zip(new_taxed, taxed))
@@ -1423,18 +1443,26 @@ TABLE_COLUMNS: tuple[TableColumn, ...] = (
                 "Federal and state tax on $1,000 more ordinary income\n"
                 "(an IRA withdrawal or Roth conversion), as a rate. Shows the\n"
                 "years where Social Security or the gains \"bump zone\" raise it."),
+    TableColumn("credits", "Education credits", True,
+                "American Opportunity and Lifetime Learning credits used this\n"
+                "year; federal tax is after them. Shown only when the plan has some."),
     TableColumn("federal_tax", "Federal tax", True),
     TableColumn("federal_by_type", "Federal tax by type (ordinary / capital gains / NIIT)", False,
                 "Federal tax split as on the Taxes by source graph:\n"
                 "tax on ordinary income, on gains and qualified dividends,\n"
-                "and the 3.8% net investment income tax"),
+                "and the 3.8% net investment income tax, after credits"),
     TableColumn("state_tax", "State tax", True),
     TableColumn("irmaa", "IRMAA surcharge", True),
+    TableColumn("aca", "ACA premiums and premium tax credit", True,
+                "Marketplace premiums for the plans bought (grown at the health\n"
+                "premium rate), the premium tax credit that pays part of them,\n"
+                "and the net cost the cash flow pays. Shown only when the plan\n"
+                "has some."),
     TableColumn("total_tax", "Total tax", False, "Federal and state tax plus IRMAA surcharges"),
     TableColumn("spending", "Spending", True, "The year's spending (Assumptions), grown with inflation"),
     TableColumn("net_cash_flow", "Net cash flow", True,
-                "Income, Social Security and withdrawals by rule,\n"
-                "less spending, tax, IRMAA and HSA contributions.\n"
+                "Income, Social Security and withdrawals by rule, less\n"
+                "spending, tax, IRMAA, net ACA premiums and HSA contributions.\n"
                 "A surplus is saved; a deficit is taken from the accounts\n"
                 "in the spending order."),
     TableColumn("shortfall", "Shortfall", False, "Spending and tax the spending order could not cover"),
@@ -1536,6 +1564,9 @@ def table_data(result: PlanResult, *, todays_dollars: bool = False, columns: lis
                 money_col(f"Gains taxed at {r:.0%}", c.tip, lambda yr, r=r: yr.gains_by_rate.get(r, 0.0))
         elif k == "marginal_rate":
             cols.append(("Marginal rate", c.tip, True, lambda yr: f"{100 * yr.marginal_rate:.1f}%"))
+        elif k == "credits":
+            if any(yr.tax.credits > 0.5 for yr in years):
+                money_col("Education credits", c.tip, lambda yr: yr.tax.credits)
         elif k == "federal_tax":
             money_col("Federal tax", "", lambda yr: yr.tax.federal_tax)
         elif k == "federal_by_type":
@@ -1545,6 +1576,11 @@ def table_data(result: PlanResult, *, todays_dollars: bool = False, columns: lis
             money_col("State tax", "", lambda yr: yr.tax.state_tax)
         elif k == "irmaa":
             money_col("IRMAA surcharge", "Medicare Part B and D surcharges paid this year", lambda yr: yr.irmaa_surcharge)
+        elif k == "aca":
+            if any(yr.tax.aca_premium > 0.5 for yr in years):
+                money_col("ACA premiums", c.tip, lambda yr: yr.tax.aca_premium)
+                money_col("ACA premium tax credit", c.tip, lambda yr: yr.tax.aca_ptc)
+                money_col("ACA net premiums", c.tip, lambda yr: yr.tax.aca_net_premium)
         elif k == "total_tax":
             money_col("Total tax", c.tip, lambda yr: yr.tax.total_tax + yr.irmaa_surcharge)
         elif k == "spending":

@@ -450,6 +450,9 @@ def render_taxes(
                      else f"Lifetime total {_money(whole)}.")
     if totals.get("irmaa"):
         notes.append("IRMAA surcharges are Medicare Part B and D premiums set by income two years earlier.")
+    credits = sum(yr.tax.credits * scale[yr.year] for yr in result.years)
+    if credits > 0.5:
+        notes.append(f"Federal tax is after {_money(credits)} of education credits.")
     notes.append("FICA payroll taxes and local income taxes are not included.")
     _legend_and_notes(fig, handles[::-1], notes, palette, ncol=3, right=0.97)
     _bar_index(fig, ax, result, "Total tax", segments)
