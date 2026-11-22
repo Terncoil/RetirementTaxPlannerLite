@@ -6,6 +6,7 @@ matplotlib Figure, so the app and the command line share them.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 
 from matplotlib import patheffects
 
@@ -41,6 +42,59 @@ TAX_COLOR_KEY = {"ordinary": "ordinary", "ltcg": "cg", "niit": "niit", "state": 
 TAX_HATCH = {"state_gains": "////", "irmaa": "...."}
 ACCOUNT_ORDER = ("taxable", "cash", "traditional_ira", "401k", "inherited_ira", "roth_ira", "roth_401k", "hsa")
 
+
+
+@dataclass
+class BarDetail:
+    """What one year's stacked bar is made of, for the app's click popup."""
+
+    year: int
+    heading: str
+    segments: list[tuple[str, str, float]]  # label, color, amount; top of the bar first
+    total: float
+    lines: list[tuple[str, str, float]] = field(default_factory=list)  # label, color, value; highest first
+
+
+@dataclass
+class BarIndex:
+    """The bars a render drew, so a click can be matched to a year.
+
+    Kept on the figure as ``fig.rtpl_bars``; the PDF report and image
+    export simply ignore it.
+    """
+
+    ax: object
+    total_label: str
+    bars: dict[int, BarDetail]
+    half_width: float = 0.39  # half of the bars' width
+
+    def hit(self, ax, x: float | None, y: float | None) -> BarDetail | None:
+        """The bar under data point (x, y) of ``ax``, or None off every bar."""
+        if ax is not self.ax or x is None or y is None:
+            return None
+        year = round(x)
+        bar = self.bars.get(year)
+        if bar is None or abs(x - year) > self.half_width or not 0 <= y <= bar.total:
+            return None
+        return bar
+
+
+def _bar_index(fig: Figure, ax, result: PlanResult, total_label: str,
+               segments: dict[int, list[tuple[str, str, float]]],
+               lines: dict[int, list[tuple[str, str, float]]] | None = None) -> None:
+    names = result.plan.profile.people
+    bars = {}
+    for yr in result.years:
+        segs = [s for s in reversed(segments.get(yr.year, [])) if s[2] > 0.5]
+        total = sum(s[2] for s in segs)
+        if not segs:
+            continue
+        ages = ", ".join(f"{names[i].name} {yr.ages[i]}" if i < len(names) and names[i].name.strip()
+                         else str(yr.ages[i]) for i in sorted(yr.ages))
+        crossing = [ln for ln in (lines or {}).get(yr.year, []) if 0 <= ln[2] <= total]
+        crossing.sort(key=lambda ln: -ln[2])
+        bars[yr.year] = BarDetail(yr.year, f"{yr.year} · {ages}" if ages else str(yr.year), segs, total, crossing)
+    fig.rtpl_bars = BarIndex(ax, total_label, bars, half_width=0.78 / 2)
 
 
 def _plan_label(plan) -> str:
@@ -173,10 +227,13 @@ def render_income(
 
     bottom = {y: 0.0 for y in years}
     handles = []
+    segments: dict[int, list[tuple[str, str, float]]] = {y: [] for y in years}
     for key, label, color, hatch, vals in series:
         heights = [vals[y] * scale[y] for y in years]
         if not any(h > 0 for h in heights):
             continue
+        for y, h in zip(years, heights):
+            segments[y].append((label, color, h))
         ax.bar(
             years, heights, bottom=[bottom[y] for y in years], width=0.78, color=color,
             edgecolor=palette.surface, linewidth=0.6, hatch=None, label=label,
@@ -198,12 +255,16 @@ def render_income(
     shown_lines = [k for k in result.line_labels if visibility.get(k, False)]
     end_labels: list[tuple[float, str]] = []
     irmaa_keys = [k for k in result.line_labels if k.startswith("irmaa:")]
+    line_values: dict[int, list[tuple[str, str, float]]] = {y: [] for y in years}
     for key in shown_lines:
         ys = [yr.lines.get(key) for yr in result.years]
         if all(v is None for v in ys):
             continue
         vals = [math.nan if v is None else v * scale[y] for v, y in zip(ys, years)]
         style = line_style(key, palette, bracket_keys, irmaa_keys)
+        for y, v in zip(years, vals):
+            if not math.isnan(v):
+                line_values[y].append((result.line_labels[key], style["color"], v))
         (ln,) = ax.plot(years, vals, drawstyle="steps-mid", label=result.line_labels[key], **style)
         line_handles.append(ln)
         last = next((v for v in reversed(vals) if not math.isnan(v)), None)
@@ -246,6 +307,7 @@ def render_income(
     if short:
         notes.append(f"Spending not covered in {short[0]}–{short[-1]}: add a withdrawal rule.")
     _legend_and_notes(fig, all_handles, notes, palette, ncol=3, right=0.92)
+    _bar_index(fig, ax, result, "Total income", segments, line_values)
 
 
 def _legend_and_notes(fig: Figure, handles, notes: list[str], palette: Palette, *, ncol: int, right: float) -> None:
@@ -293,6 +355,7 @@ def render_balances(
     bottom = {y: 0.0 for y in years}
     handles = []
     by_kind_count: dict[str, int] = {}
+    segments: dict[int, list[tuple[str, str, float]]] = {y: [] for y in years}
     for key, label, ids, kind in groups:
         heights = [sum(yr.balances_end.get(a, 0.0) for a in ids) * scale[yr.year] for yr in result.years]
         if not any(h > 0.5 for h in heights):
@@ -301,6 +364,8 @@ def render_balances(
         n = by_kind_count.get(kind, 0)
         by_kind_count[kind] = n + 1
         color = _shades(base, palette, n + 1)[n]
+        for y, h in zip(years, heights):
+            segments[y].append((label, color, h))
         hatch = ACCOUNT_HATCH.get(kind)
         ax.bar(years, heights, bottom=[bottom[y] for y in years], width=0.78, color=color,
                edgecolor=palette.surface, linewidth=0.6)
@@ -319,6 +384,7 @@ def render_balances(
                  color=palette.text_primary, fontsize=11, loc="left")
     ax.set_ylabel("Balance", color=palette.text_secondary)
     _legend_and_notes(fig, handles[::-1], list(result.notes), palette, ncol=4, right=0.97)
+    _bar_index(fig, ax, result, "Total balance", segments)
 
 
 def tax_color(key: str, palette: Palette) -> str:
@@ -347,6 +413,7 @@ def render_taxes(
     bottom = {y: 0.0 for y in years}
     handles = []
     totals: dict[str, float] = {}
+    segments: dict[int, list[tuple[str, str, float]]] = {y: [] for y in years}
     for key in TAX_SOURCES:
         heights = [max(0.0, by_year[y][key]) * scale[y] for y in years]
         if not any(h > 0.5 for h in heights):
@@ -355,6 +422,8 @@ def render_taxes(
         color = tax_color(key, palette)
         hatch = TAX_HATCH.get(key)
         label = TAX_SOURCE_LABELS[key]
+        for y, h in zip(years, heights):
+            segments[y].append((label, color, h))
         ax.bar(years, heights, bottom=[bottom[y] for y in years], width=0.78, color=color,
                edgecolor=palette.surface, linewidth=0.6, label=label)
         if hatch:
@@ -383,3 +452,4 @@ def render_taxes(
         notes.append("IRMAA surcharges are Medicare Part B and D premiums set by income two years earlier.")
     notes.append("FICA payroll taxes and local income taxes are not included.")
     _legend_and_notes(fig, handles[::-1], notes, palette, ncol=3, right=0.97)
+    _bar_index(fig, ax, result, "Total tax", segments)

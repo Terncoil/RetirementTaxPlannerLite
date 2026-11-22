@@ -380,3 +380,53 @@ def test_side_panels_follow_each_theme_change(window, pinned):
         color = img.pixelColor(img.width() // 2, img.height() - 6)
         assert (color.lightness() > 128) is light, (mode, color.name())
     window.set_theme_mode("system")
+
+
+def test_clicking_a_bar_shows_its_breakdown(window):
+    """A click on a bar lists its segments, the total, then the lines crossing it;
+    a click off the bars or Escape closes the list."""
+    from matplotlib.backend_bases import KeyEvent, MouseEvent
+
+    from rtpl.model.plan import Plan
+
+    path = Path("examples/plans/couple_conversions_inherited.json")
+    window.load_plan(Plan.load(path), path)
+    view = window.plan_view
+    view.tabs.setCurrentWidget(view.income_canvas)
+    canvas, fig, popup = view.income_canvas, view.income_fig, view.popups[0]
+    canvas.draw()
+    index = fig.rtpl_bars
+    year, bar = next((y, b) for y, b in index.bars.items() if b.lines)
+    assert abs(bar.total - sum(s[2] for s in bar.segments)) < 1
+    assert all(0 <= v <= bar.total for _l, _c, v in bar.lines)
+
+    def click(x, y, button=1):
+        px, py = index.ax.transData.transform((x, y))
+        MouseEvent("button_press_event", canvas, px, py, button=button)._process()
+
+    click(year, bar.total / 2)
+    assert (not popup.isHidden()) and popup.bar is bar
+    text = popup.text()
+    assert "Total income" in text and "Lines crossing this bar" in text
+    # Segments come first, then the total, then the lines.
+    assert text.index(bar.segments[0][0]) < text.index("Total income") < text.index(bar.lines[0][0])
+    assert popup.geometry().right() <= canvas.width() and popup.geometry().bottom() <= canvas.height()
+
+    click(year, bar.total * 1.03)  # above the bar
+    assert not (not popup.isHidden())
+    click(year, bar.total / 2)
+    KeyEvent("key_press_event", canvas, "escape")._process()
+    assert not (not popup.isHidden())
+    click(year, bar.total / 2)
+    view.todays.setChecked(True)  # a redraw closes it, since the bars moved
+    assert not (not popup.isHidden())
+
+    view.tabs.setCurrentWidget(view.tax_canvas)
+    view.tax_canvas.draw()
+    tax_index = view.tax_fig.rtpl_bars
+    ty, tbar = next(iter(tax_index.bars.items()))
+    px, py = tax_index.ax.transData.transform((ty, tbar.total / 2))
+    MouseEvent("button_press_event", view.tax_canvas, px, py, button=1)._process()
+    assert (not view.popups[1].isHidden()) and "Total tax" in view.popups[1].text()
+    view.tabs.setCurrentWidget(view.bal_canvas)
+    assert not (not view.popups[1].isHidden())
