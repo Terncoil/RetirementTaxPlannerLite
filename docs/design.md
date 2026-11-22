@@ -505,7 +505,11 @@ low-tax stretch, a jump when RMDs start at 75, and another when the
 survivor files single.
 
 **Balances.** Year-end balances by account type (or by account), colored
-to match the income each feeds. **Year table.** For screen readers and
+to match the income each feeds. **Bar details.** Clicking a bar on any of
+the three graphs pops up that year's segments (top of the bar first) with
+exact amounts and the total, then, on the income graph, each shown
+threshold line that crosses the bar and its value. A click off the bars,
+Escape, a redraw, a resize or a tab change closes it. **Year table.** For screen readers and
 copying. The suggested columns are ages, filing status, income by
 category, total income, AGI, taxable income, IRMAA MAGI, federal and state
 tax, IRMAA, spending, net cash flow, total balances and notes, plus

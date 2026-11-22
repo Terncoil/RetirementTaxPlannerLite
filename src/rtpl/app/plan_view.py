@@ -34,6 +34,7 @@ from PySide6.QtWidgets import (
 )
 
 from rtpl.app import TIP_WIDTH
+from rtpl.app.bar_popup import BarPopup
 from rtpl.charts.forward_chart import line_short_label, render_balances, render_income, render_taxes
 from rtpl.engine.forward import (
     DEFAULT_TABLE_COLUMNS,
@@ -117,6 +118,15 @@ class PlanView(QWidget):
         self.bal_canvas = FigureCanvasQTAgg(self.bal_fig)
         self.bal_canvas.setAccessibleName("Account balances chart")
         self.tabs.addTab(self.bal_canvas, "&Balances")
+        # Click a bar to list its segments, total and the lines crossing it.
+        self.popups = [BarPopup(canvas, fig, lambda: self.palette)
+                       for canvas, fig in ((self.income_canvas, self.income_fig), (self.tax_canvas, self.tax_fig),
+                                           (self.bal_canvas, self.bal_fig))]
+        for canvas in (self.income_canvas, self.tax_canvas, self.bal_canvas):
+            canvas.setAccessibleDescription(
+                (canvas.accessibleDescription() + " " if canvas.accessibleDescription() else "")
+                + "Click a bar to see its amounts.")
+        self.tabs.currentChanged.connect(self._dismiss_popups)
         table_page = QWidget()
         tlay = QVBoxLayout(table_page)
         tlay.setContentsMargins(0, 4, 0, 0)
@@ -170,9 +180,11 @@ class PlanView(QWidget):
 
     def _paint_empty(self) -> None:
         """Blank charts in the theme's background, so dark mode has no white page."""
+        self._dismiss_popups()
         for fig, canvas in ((self.income_fig, self.income_canvas), (self.tax_fig, self.tax_canvas),
                             (self.bal_fig, self.bal_canvas)):
             fig.clear()
+            fig.rtpl_bars = None  # no bars to click
             if self.palette is not None:
                 fig.set_facecolor(self.palette.surface)
             canvas.draw_idle()
@@ -314,7 +326,12 @@ class PlanView(QWidget):
             self._paint_empty()
         self.redraw()
 
+    def _dismiss_popups(self, *_args) -> None:
+        for popup in self.popups:
+            popup.dismiss()
+
     def redraw(self, *_args) -> None:
+        self._dismiss_popups()
         if self.result is None or self.palette is None:
             return
         vis = self.visibility()
