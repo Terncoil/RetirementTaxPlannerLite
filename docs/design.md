@@ -111,6 +111,12 @@ each income limit), plus `keep` (share left once phased out) and `income`
 taxable Social Security, or `state_income` = the state's income before its
 deductions; exclusions can only use the first three).
 
+Where a file approximates the law on purpose (Minnesota's Social Security
+phase-out and Connecticut's exemption phase-out are smoothed into straight
+lines rather than steps), its `chart_notes` say so in the footnotes under
+the marginal graph while the state layer is shown. The note sits next to
+the rule in the same file, so whoever enters the exact rule removes it.
+
 **User overrides.** The app also reads a `taxlaw` folder in the user's
 config directory; a file there replaces the shipped file for that year or
 state. Nothing needs code changes.

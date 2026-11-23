@@ -14,6 +14,11 @@ notes = [
   "Personal exemption falls $1,000 for each $1,000 of income over the limit; modelled as a smooth $1 per $1. The personal tax credit is not modelled.",
   "Pension and IRA income is fully deductible with AGI under $75,000 single / $100,000 joint, then a falling share in steps (cliffs) to $100,000 / $150,000. Benefit recapture not modelled.",
 ]
+# Shown under the marginal graph. Remove it if the exemption phase-out is
+# changed to the exact $1,000 steps.
+chart_notes = [
+  "Personal exemption phase-out smoothed (the law takes $1,000 off for each $1,000 of income over the limit, in steps).",
+]
 
 [brackets]
 single = [[0, 0.02], [10000, 0.045], [50000, 0.055], [100000, 0.06], [200000, 0.065], [250000, 0.069], [500000, 0.0699]]

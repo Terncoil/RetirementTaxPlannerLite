@@ -457,6 +457,9 @@ class StateLaw:
     gains_only_deduction: float = 0.0
     gains_rates: dict[str, Schedule] | None = None  # separate stacked rates for long-term gains (MT)
     notes: tuple[str, ...] = ()
+    # Footnotes for the marginal graph where the file approximates the law
+    # (a smoothed phase-out, say). Remove one when the file gets the exact rule.
+    chart_notes: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
 
     @property
@@ -565,6 +568,7 @@ def _parse_state(raw: dict) -> StateLaw:
             if "capital_gains_rates" in raw else None
         ),
         notes=tuple(raw.get("notes", ())),
+        chart_notes=tuple(raw.get("chart_notes", ())),
         sources=tuple(raw.get("sources", ())),
     )
 

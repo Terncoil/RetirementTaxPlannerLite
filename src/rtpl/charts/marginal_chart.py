@@ -180,6 +180,8 @@ def render_marginal(
             t.set_color(palette.text_primary)
 
     notes = list(series.notes)
+    if visibility.get("state") and series.state is not None:
+        notes.extend(f"{series.state.code}: {n}" for n in series.state.chart_notes)
     if visibility.get("irmaa") and series.irmaa_note and any(a.kind == "irmaa" for a in ann):
         notes.append(series.irmaa_note)
     if notes:

@@ -189,3 +189,28 @@ def test_smooth_states_have_no_cliffs(lib):
     for code in ("UT", "VA", "MN", "VT"):
         s = build_marginal_series(utah_couple(code), lib, x_max=250_000, step=100)
         assert not [a for a in s.annotations if a.kind == "state_cliff"], code
+
+
+def test_approximated_states_add_a_chart_footnote(lib):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from matplotlib.figure import Figure
+
+    from rtpl.charts.marginal_chart import render_marginal
+    from rtpl.engine.marginal import default_visibility
+    from rtpl.theme import Theme
+
+    assert lib.state("MN").chart_notes and lib.state("CT").chart_notes
+    assert not lib.state("UT").chart_notes
+    s = build_marginal_series(utah_couple("MN"), lib, x_max=250_000, step=100)
+    palette = Theme.load().palette("light")
+
+    def footnotes(vis):
+        fig = Figure()
+        render_marginal(fig, s, vis, palette)
+        return "\n".join(t.get_text() for t in fig.texts)
+
+    vis = default_visibility(s)
+    assert "MN: Social Security subtraction phase-out smoothed" in footnotes(vis)
+    assert "MN:" not in footnotes({**vis, "state": False})
