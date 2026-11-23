@@ -32,6 +32,7 @@ on:
       - "src/rtpl/__init__.py"
       - "src/rtpl/data/icons/**"
       - "pyproject.toml"
+      - "examples/**"
       - ".github/workflows/build.yml"
 
 permissions:
@@ -129,14 +130,22 @@ jobs:
           sleep 15
           kill -0 $pid   # still running means it started without crashing
           kill $pid || true
+      # The examples folder goes next to the app, where people can see it
+      # and open its files with File > Open. On macOS it can't go inside the
+      # .app (Finder hides that), so the zip holds a folder with the app and
+      # the examples side by side.
       - name: Zip
         shell: bash
         run: |
           zip="RetirementTaxPlannerLite-$VERSION-$RUNNER_OS.zip"
           cd dist
           if [ "$RUNNER_OS" = macOS ]; then
-            ditto -c -k --keepParent RetirementTaxPlannerLite.app "../$zip"
+            mkdir -p package/RetirementTaxPlannerLite
+            ditto RetirementTaxPlannerLite.app package/RetirementTaxPlannerLite/RetirementTaxPlannerLite.app
+            cp -R ../examples package/RetirementTaxPlannerLite/examples
+            ditto -c -k --keepParent package/RetirementTaxPlannerLite "../$zip"
           else
+            cp -R ../examples RetirementTaxPlannerLite/examples
             7z a -r "../$zip" RetirementTaxPlannerLite > /dev/null
           fi
           echo "ZIP=$zip" >> "$GITHUB_ENV"

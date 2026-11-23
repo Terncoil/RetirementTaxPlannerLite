@@ -78,7 +78,9 @@ change only docs, tests or examples need no bump.
 
 The **build apps** workflow builds the apps (macOS only when switched on, see
 below), checks that each one starts and carries the right version, and zips them as
-`RetirementTaxPlannerLite-<version>-<OS>.zip`. It runs:
+`RetirementTaxPlannerLite-<version>-<OS>.zip`. Each zip also holds a copy
+of the `examples` folder (sample profiles and plans) next to the app, so
+people can try it with File > Open. It runs:
 
 * **On every push to `main`** (so after each merged pull request). The zips
   are on that run's page in the Actions tab, under *Artifacts*, for 30 days.
@@ -89,7 +91,7 @@ below), checks that each one starts and carries the right version, and zips them
   merged pull requests. Releases stay for good, and anyone who can see the
   repository can download them. Because every app change raises the version,
   every merged app change becomes a release.
-* On pull requests that change packaging or app code, and by hand
+* On pull requests that change packaging, app code or the examples, and by hand
   (Actions tab, "build apps", "Run workflow"): builds only, no release.
 
 ### macOS builds are off for now
@@ -122,12 +124,16 @@ The builds are not code-signed, so each OS warns the first time:
 
 * **Windows:** unzip, run `RetirementTaxPlannerLite.exe`. If SmartScreen
   says "Windows protected your PC", click *More info*, then *Run anyway*.
-* **macOS** (Apple Silicon): unzip, drag the app to Applications, then
+* **macOS** (Apple Silicon): unzip, open the `RetirementTaxPlannerLite`
+  folder, drag the app to Applications (keep the `examples` folder wherever
+  you like), then
   right-click it, *Open*, and *Open* again. On recent macOS, if that does
   not offer *Open*, go to System Settings, Privacy & Security, and click
   *Open Anyway*.
 * **Linux** (x86-64): unzip and run
   `RetirementTaxPlannerLite/RetirementTaxPlannerLite`.
+
+On every OS the sample files are in `RetirementTaxPlannerLite/examples`.
 
 Next steps not done yet: an Intel Mac build, a Windows installer (for example Inno Setup,
 which would also make the Start-menu shortcut), macOS code signing and
