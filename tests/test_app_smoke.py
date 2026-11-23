@@ -322,7 +322,7 @@ def test_file_menu_groups_and_report_item(window):
         else:
             current.append(act.text().replace("&", ""))
     groups.append(current)
-    assert [len(g) for g in groups] == [4, 3, 3, 1]
+    assert [len(g) for g in groups] == [5, 1, 3, 1]
     assert groups[2][-1] == "Export Report…"
 
 
