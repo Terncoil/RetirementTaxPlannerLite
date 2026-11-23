@@ -66,7 +66,7 @@ class PlanView(QWidget):
         self.line_checks: dict[str, QCheckBox] = {}
 
         lay = QVBoxLayout(self)
-        self.summary = QLabel("No plan open. Use File > Open to open a plan, or File > New Plan from Profile.")
+        self.summary = QLabel("No plan for profile. Use File > New Plan from Profile to add a plan.")
         self.summary.setWordWrap(True)
         self.summary.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.summary.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
@@ -174,7 +174,7 @@ class PlanView(QWidget):
         self.last_change = ""
         if plan is None:
             self.result = None
-            self.summary.setText("No plan open. Use File > Open to open a plan, or File > New Plan from Profile.")
+            self.summary.setText("No plan for profile. Use File > New Plan from Profile to add a plan.")
             self.table.setRowCount(0)
             self._paint_empty()
 
