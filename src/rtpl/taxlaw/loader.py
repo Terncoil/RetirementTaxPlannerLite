@@ -291,6 +291,116 @@ def _parse_federal(raw: dict) -> FederalLaw:
     )
 
 
+# Income measures a state phase-out can be based on. The first three are
+# federal amounts; "state_income" is the state's own income before its
+# standard deduction and exemptions (after its Social Security and
+# retirement exclusions), so exclusions can't phase out on it.
+PHASEOUT_INCOMES = ("agi", "magi", "agi_ex_ss", "state_income")
+FEDERAL_PHASEOUT_INCOMES = ("agi", "magi", "agi_ex_ss")
+
+
+@dataclass(frozen=True)
+class Phaseout:
+    """How a state deduction, exemption, exclusion or credit shrinks with income.
+
+    One of these shapes, above ``start``:
+
+    * ``rate``: the amount falls by ``rate`` dollars for each dollar of
+      income over ``start`` (Utah's credits, Virginia's age deduction).
+    * ``width``: the amount falls in a straight line to ``keep`` of itself
+      over ``width`` dollars; a width of 0 is a cliff.
+    * ``step`` and ``step_fraction``: the amount falls by ``step_fraction``
+      of itself for each ``step`` dollars, or part of one, over ``start``.
+    * ``tiers``: the share kept is that of the first tier whose ``up_to``
+      the income doesn't pass, else ``keep`` (New Jersey's pension
+      exclusion, Ohio's exemption).
+
+    ``income`` names the measure tested; see ``PHASEOUT_INCOMES``.
+    """
+
+    start: dict[str, float] = field(default_factory=dict)
+    rate: float | None = None
+    width: dict[str, float] | None = None
+    step: float | None = None
+    step_fraction: float = 0.0
+    tiers: tuple[tuple[dict[str, float], dict[str, float]], ...] = ()  # (up_to, keep)
+    keep: float = 0.0  # share still allowed once fully phased out
+    income: str = "agi"
+
+    def apply(self, amount: float, income: float, fs: str) -> float:
+        """What is left of ``amount`` at this ``income``."""
+        if amount <= 0:
+            return amount
+        if self.tiers:
+            for up_to, share in self.tiers:
+                if income <= up_to[fs]:
+                    return amount * share[fs]
+            return amount * self.keep
+        over = income - self.start.get(fs, 0.0)
+        if over <= 0:
+            return amount
+        floor = amount * self.keep
+        if self.rate is not None:
+            return max(floor, amount - self.rate * over)
+        if self.step:
+            steps = math.ceil(over / self.step - 1e-9)
+            return max(floor, amount * (1.0 - steps * self.step_fraction))
+        if self.width is not None and self.width[fs] > 0:
+            return max(floor, amount * (1.0 - over / self.width[fs]))
+        return floor  # a cliff
+
+
+def _by_status_or_number(value) -> dict[str, float]:
+    if isinstance(value, dict):
+        return _status_table(value)
+    return {k: float(value) for k in FILING_STATUSES}
+
+
+def _parse_phaseout(raw: dict | None, *, federal_only: bool = False) -> Phaseout | None:
+    if not raw:
+        return None
+    income = str(raw.get("income", "agi"))
+    allowed = FEDERAL_PHASEOUT_INCOMES if federal_only else PHASEOUT_INCOMES
+    if income not in allowed:
+        raise ValueError(f"phase-out income must be one of {', '.join(allowed)}, not {income!r}")
+    return Phaseout(
+        start=_status_table(raw.get("start")),
+        rate=float(raw["rate"]) if "rate" in raw else None,
+        width=_status_table(raw["width"]) if "width" in raw else None,
+        step=float(raw["step"]) if "step" in raw else None,
+        step_fraction=float(raw.get("step_fraction", 0.0)),
+        tiers=tuple(
+            (_status_table(t["up_to"], default=math.inf), _by_status_or_number(t["keep"]))
+            for t in raw.get("tiers", ())
+        ),
+        keep=float(raw.get("keep", 0.0)),
+        income=income,
+    )
+
+
+@dataclass(frozen=True)
+class StateCredit:
+    """A nonrefundable state credit, optionally phased out with income.
+
+    The amount is the sum of whichever of these the file gives: a flat
+    ``amount`` by filing status, ``per_person`` for each person who meets
+    ``min_age`` and ``born_before``, ``federal_deduction_rate`` times the
+    federal standard (or itemized) deduction, and ``social_security_rate``
+    times the Social Security the state taxes. Of credits sharing a
+    ``group``, only the largest counts (a filer picks one).
+    """
+
+    name: str
+    amount: dict[str, float] | None = None
+    per_person: float = 0.0
+    min_age: int = 0
+    born_before: int | None = None
+    federal_deduction_rate: float = 0.0
+    social_security_rate: float = 0.0
+    group: str | None = None
+    phaseout: Phaseout | None = None
+
+
 @dataclass(frozen=True)
 class RetirementExclusion:
     """Per-person exclusion of pension and/or IRA income from state tax."""
@@ -298,6 +408,10 @@ class RetirementExclusion:
     amount: float  # math.inf = unlimited
     min_age: int = 0
     applies_to: tuple[str, ...] = ("pension", "ira")
+    phaseout: Phaseout | None = None  # federal income measures only
+    # A cap for the whole return by filing status instead of ``amount`` per
+    # person (New Jersey's pension exclusion).
+    per_return: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -308,6 +422,10 @@ class SocialSecurityRule:
     exempt_if_agi_at_most: dict[str, float] | None = None
     phaseout_width: dict[str, float] | None = None  # linear phase-out above the limit
     exempt_fraction_above: float = 0.0  # share still exempt above the limit
+    # Benefits of people this age+ (and under exempt_from_age) are exempt,
+    # subject to limited_phaseout (Colorado at 55-64).
+    limited_from_age: int | None = None
+    limited_phaseout: Phaseout | None = None
 
 
 @dataclass(frozen=True)
@@ -328,6 +446,11 @@ class StateLaw:
     social_security: SocialSecurityRule = field(default_factory=SocialSecurityRule)
     retirement_exclusions: tuple[RetirementExclusion, ...] = ()
     age_deduction: tuple[float, int] | None = None  # (amount per person, min age)
+    # Income phase-outs of the amounts above (None = no phase-out).
+    standard_deduction_phaseout: Phaseout | None = None
+    exemption_phaseout: Phaseout | None = None  # per-person exemptions and credits
+    age_deduction_phaseout: Phaseout | None = None
+    credits: tuple[StateCredit, ...] = ()
     capital_gains_exclusion: float = 0.0  # share of net long-term gains excluded
     capital_gains_max_rate: float | None = None  # alternative cap on the rate for gains
     gains_only_tax: Schedule | None = None  # e.g. Washington: tax on long-term gains only
@@ -379,6 +502,8 @@ def _parse_state(raw: dict) -> StateLaw:
         exempt_if_agi_at_most=_status_table(ss_raw["exempt_if_agi_at_most"]) if "exempt_if_agi_at_most" in ss_raw else None,
         phaseout_width=_status_table(ss_raw["phaseout_width"]) if "phaseout_width" in ss_raw else None,
         exempt_fraction_above=float(ss_raw.get("exempt_fraction_above", 0.0)),
+        limited_from_age=ss_raw.get("limited_from_age"),
+        limited_phaseout=_parse_phaseout(ss_raw.get("limited_phaseout"), federal_only=True),
     )
     exclusions = []
     if raw.get("exempt_retirement_income"):
@@ -388,11 +513,28 @@ def _parse_state(raw: dict) -> StateLaw:
         exclusions.append(
             RetirementExclusion(
                 amount=math.inf if amt == "unlimited" else float(amt),
+                per_return=_status_table(ex["per_return"]) if "per_return" in ex else None,
                 min_age=int(ex.get("min_age", 0)),
                 applies_to=tuple(ex.get("applies_to", ("pension", "ira"))),
+                phaseout=_parse_phaseout(ex.get("phaseout"), federal_only=True),
             )
         )
     age_ded = raw.get("age_deduction")
+    credits = []
+    for c in raw.get("credits", []):
+        credits.append(
+            StateCredit(
+                name=str(c.get("name", "Credit")),
+                amount=_status_table(c["amount"]) if "amount" in c else None,
+                per_person=float(c.get("per_person", 0.0)),
+                min_age=int(c.get("min_age", 0)),
+                born_before=c.get("born_before"),
+                federal_deduction_rate=float(c.get("federal_deduction_rate", 0.0)),
+                social_security_rate=float(c.get("social_security_rate", 0.0)),
+                group=c.get("group"),
+                phaseout=_parse_phaseout(c.get("phaseout")),
+            )
+        )
     gains = raw.get("capital_gains_tax")
     return StateLaw(
         code=str(raw["code"]).upper(),
@@ -410,6 +552,10 @@ def _parse_state(raw: dict) -> StateLaw:
         social_security=ss,
         retirement_exclusions=tuple(exclusions),
         age_deduction=(float(age_ded["amount"]), int(age_ded["min_age"])) if age_ded else None,
+        standard_deduction_phaseout=_parse_phaseout(raw.get("standard_deduction", {}).get("phaseout")),
+        exemption_phaseout=_parse_phaseout(raw.get("exemption", {}).get("phaseout")),
+        age_deduction_phaseout=_parse_phaseout(age_ded.get("phaseout")) if age_ded else None,
+        credits=tuple(credits),
         capital_gains_exclusion=float(raw.get("capital_gains_exclusion", 0.0)),
         capital_gains_max_rate=raw.get("capital_gains_max_rate"),
         gains_only_tax=Schedule.from_pairs(gains["brackets"]) if gains else None,

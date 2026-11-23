@@ -5,10 +5,13 @@
 code = "CO"
 name = "Colorado"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)",
+  "Colorado DOR, Social Security, Pensions, and Annuities (Jan 2025)",
+]
 taxes_social_security = true
 notes = [
-  "Social Security is fully exempt at 65+; the 55-64 exemption (income-limited) is not modelled.",
+  "Social Security is fully exempt at 65+, and at 55-64 with AGI up to $75,000 single / $95,000 joint (a cliff).",
   "Pension/IRA subtraction $24,000 at 65+ ($20,000 at 55-64 not modelled).",
 ]
 
@@ -22,6 +25,8 @@ mfj    = 32200
 
 [social_security]
 exempt_from_age = 65
+limited_from_age = 55
+limited_phaseout = { start = { single = 75000, mfj = 95000 } }  # a cliff
 
 [[retirement_exclusions]]
 amount = 24000

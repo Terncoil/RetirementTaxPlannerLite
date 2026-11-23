@@ -310,7 +310,8 @@ def compute_tax(
     state_tax = state_gains_tax = 0.0
     if state is not None:
         state_income, state_gains_tax = state_income_tax(
-            profile, state, agi=agi, taxable_ss=taxable_ss, net_ltcg=ltcg, extra_ira=add_ord
+            profile, state, agi=agi, taxable_ss=taxable_ss, net_ltcg=ltcg, extra_ira=add_ord,
+            federal_deduction=max(std, h.itemized_deductions), tax_exempt_interest=h.tax_exempt_interest,
         )
         state_tax = state_income + state_gains_tax
 

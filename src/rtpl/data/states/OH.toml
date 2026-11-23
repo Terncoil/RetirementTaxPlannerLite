@@ -5,10 +5,13 @@
 code = "OH"
 name = "Ohio"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)",
+  "Ohio Rev. Code 5747.025 (personal exemption by income)",
+]
 taxes_social_security = false
 notes = [
-  "Exemption phases down with income; retirement and senior credits and municipal income taxes not modelled.",
+  "Exemption $2,400 per person with income to $40K, $2,150 to $80K, $1,900 to $500K, none above (steps). Retirement and senior credits and municipal income taxes not modelled.",
 ]
 
 [brackets]
@@ -21,3 +24,10 @@ mfj    = 0
 
 [exemption]
 per_person = 2400
+[exemption.phaseout]
+income = "state_income"
+tiers = [
+  { up_to = { single = 40000, mfj = 40000 }, keep = 1 },
+  { up_to = { single = 80000, mfj = 80000 }, keep = 0.8958333 },    # $2,150
+  { up_to = { single = 500000, mfj = 500000 }, keep = 0.7916667 },  # $1,900
+]

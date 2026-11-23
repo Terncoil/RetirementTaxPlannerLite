@@ -5,10 +5,13 @@
 code = "VA"
 name = "Virginia"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)",
+  "Va. Code 58.1-322.03 and Form 760 instructions (age deduction)",
+]
 taxes_social_security = false
 notes = [
-  "Age deduction of $12,000 at 65+ modelled without its income phase-out.",
+  "Age deduction of $12,000 at 65+ falls $1 per $1 of AGI less taxable Social Security over $50,000 single / $75,000 married (for the couple together); the unreduced deduction for those born before Jan 2, 1939 is not modelled.",
 ]
 
 [brackets]
@@ -25,3 +28,4 @@ per_person = 930
 [age_deduction]
 amount = 12000
 min_age = 65
+phaseout = { start = { single = 50000, mfj = 75000, mfs = 75000 }, rate = 1.0, income = "agi_ex_ss" }

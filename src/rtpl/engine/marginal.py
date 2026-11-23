@@ -35,6 +35,12 @@ IRMAA and the ACA thresholds are cliffs in premiums rather than taxes, so
 they are returned as annotations (where along the X axis each threshold is
 crossed) instead of being folded into the rate. The ACA 400% line carries
 the subsidy lost there; the gradual phase-out below it is the ``ptc`` layer.
+
+State tax cliffs (an exemption, exclusion or credit lost all at once, such
+as New Mexico's Social Security exemption above $150K) are annotations too:
+a jump of thousands of dollars inside one $100 step would otherwise draw a
+spike of thousands of percent and flatten the rest of the graph. The jump
+is taken out of the step's ``state`` rate and shown as a line with its cost.
 """
 
 from __future__ import annotations
@@ -49,7 +55,7 @@ from .tax import IncomeSource, TaxResult, aca_premiums, compute_tax, premium_tax
 
 # Stack order, bottom up. Negative rates (the nonref layer) stack down from 0.
 LAYERS = ("ordinary", "ss", "cg", "senior", "edu", "niit", "state", "state_cg", "ptc", "nonref")
-ANNOTATIONS = ("irmaa", "aca")
+ANNOTATIONS = ("irmaa", "aca", "state_cliff")
 
 LAYER_LABELS = {
     "ordinary": "Tax on Ordinary Income",
@@ -67,7 +73,7 @@ LAYER_LABELS = {
 
 @dataclass(frozen=True)
 class Annotation:
-    kind: str  # "irmaa" or "aca"
+    kind: str  # "irmaa", "aca" or "state_cliff"
     x: float  # additional income at which the threshold is crossed
     magi: float  # the MAGI threshold itself
     label: str
@@ -204,6 +210,9 @@ def build_marginal_series(
         rates = _layer_rates(profile, law, state, source, grid[i], grid[i + 1], results[i], results[i + 1])
         for k in LAYERS:
             layers[k].append(rates[k])
+    cliffs = _state_cliffs(profile, law, state, source, grid, layers["state"]) if state is not None else []
+    for x, jump in cliffs:
+        layers["state"][min(n - 1, int(x // step))] -= jump / step
 
     series = MarginalSeries(
         profile=profile,
@@ -221,9 +230,92 @@ def build_marginal_series(
             f"{profile.year} tax law is projected from {law.projected_from} "
             f"at {law.inflation_used:.1%} inflation."
         )
+    series.annotations.extend(state_cliff_annotations(series, cliffs))
     series.annotations.extend(irmaa_annotations(series, library, irmaa_basis))
     series.annotations.extend(aca_annotations(series))
     return series
+
+
+# A step whose state rate tops both neighbours by this much is checked for
+# a cliff; a cliff smaller than CLIFF_MIN dollars is left in the rate.
+_CLIFF_CHECK = 0.02
+CLIFF_MIN = 1.0
+
+
+def _state_income_tax_at(profile, law, state, source, x: float) -> float:
+    r = compute_tax(profile, law, state, extra=x, source=source)
+    return r.state_tax - r.state_gains_tax
+
+
+def _state_cliffs(
+    profile: Profile,
+    law: FederalLaw,
+    state: StateLaw,
+    source: IncomeSource,
+    grid: list[float],
+    state_rates: list[float],
+) -> list[tuple[float, float]]:
+    """``(x, jump)`` for each point where state income tax jumps.
+
+    A step that holds a jump shows a rate well above the steps on either
+    side. Bisection then finds the jump to the cent: the half kept is the
+    one where tax rises faster than the neighbouring rates explain.
+    """
+    out: list[tuple[float, float]] = []
+    n = len(state_rates)
+    for i in range(n):
+        near = [state_rates[j] for j in (i - 1, i + 1) if 0 <= j < n]
+        if not near:
+            continue
+        slope = max(near) + _CLIFF_CHECK
+        if state_rates[i] <= slope:
+            continue
+
+        def tax(x: float) -> float:
+            return _state_income_tax_at(profile, law, state, source, x)
+
+        def excess(a: float, b: float, ta: float, tb: float) -> float:
+            return (tb - ta) - (b - a) * slope
+
+        a, b = grid[i], grid[i + 1]
+        ta, tb = tax(a), tax(b)
+        if excess(a, b, ta, tb) < CLIFF_MIN:
+            continue
+        while b - a > 0.01:
+            m = (a + b) / 2
+            tm = tax(m)
+            if excess(a, m, ta, tm) >= excess(m, b, tm, tb):
+                b, tb = m, tm
+            else:
+                a, ta = m, tm
+        jump = (tb - ta) - (b - a) * state_rates[i - 1 if i > 0 else i + 1]
+        if jump >= CLIFF_MIN:
+            out.append((round(b, 2), jump))
+    return out
+
+
+def state_cliff_annotations(series: "MarginalSeries", cliffs: list[tuple[float, float]]) -> list[Annotation]:
+    st = series.state
+    if st is None:
+        return []
+    out = []
+    for x, jump in cliffs:
+        r = compute_tax(series.profile, series.law, st, extra=x, source=series.source)
+        out.append(
+            Annotation(
+                kind="state_cliff",
+                x=x,
+                magi=r.agi,
+                label=f"{st.code} cliff",
+                detail=(
+                    f"{st.name} tax rises by about ${jump:,.0f} in one dollar at AGI ${r.agi:,.0f} "
+                    f"(an exemption, exclusion or credit ends or steps down)"
+                ),
+                annual_cost=jump,
+                sublabel=f"+${jump:,.0f} tax",
+            )
+        )
+    return out
 
 
 def _layer_rates(
@@ -468,6 +560,7 @@ def default_visibility(series: MarginalSeries) -> dict[str, bool]:
         person.age_in(p.year) < 65 and not person.on_medicare(p.year) for person in p.people
     )
     vis["aca"] = p.household.aca_marketplace and under_65_no_medicare
+    vis["state_cliff"] = any(a.kind == "state_cliff" for a in series.annotations)
     return vis
 
 

@@ -5,11 +5,15 @@
 code = "WI"
 name = "Wisconsin"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)",
+  "2025 Form 1 instructions (retirement income subtraction at 67+)",
+]
 taxes_social_security = false
 capital_gains_exclusion = 0.3
 notes = [
   "Standard deduction phases out with income (not modelled); 30% of long-term gains excluded.",
+  "Up to $24,000 of pension/IRA income per person at 67+ is subtracted (2025 Act 15); the $5,000 income-limited subtraction is not modelled.",
 ]
 
 [brackets]
@@ -22,3 +26,7 @@ mfj    = 25840
 
 [exemption]
 per_person = 700
+
+[[retirement_exclusions]]
+amount = 24000
+min_age = 67

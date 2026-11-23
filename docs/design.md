@@ -94,8 +94,22 @@ hold brackets, standard deduction, personal exemptions (as deductions or
 credits), a Social Security rule (exempt, taxed, exempt from an age, or
 exempt below an AGI limit with an optional phase-out), per-person
 pension/IRA exclusions with minimum ages, an age-based deduction, capital
-gains exclusions or rate caps, and a gains-only tax (Washington). hoh and
+gains exclusions or rate caps, a gains-only tax (Washington), and
+nonrefundable `[[credits]]` (a flat amount, an amount per person, a share
+of the federal deduction, or a share of the Social Security the state
+taxes; of credits in the same `group` only the largest counts). hoh and
 mfs use the single values unless a file lists them.
+
+The standard deduction, exemption, age deduction, each retirement
+exclusion, each credit and the 55-64 Social Security exemption can take a
+`phaseout`, all in one format: a `start` by filing status and one shape,
+`rate` (dollars lost per dollar over, e.g. Utah's 1.3% taxpayer credit
+phase-out), `width` (a straight line to zero, 0 for a cliff), `step` and
+`step_fraction` (e.g. 10% for each $4,000), or `tiers` (share kept up to
+each income limit), plus `keep` (share left once phased out) and `income`
+(`agi`, `magi` = AGI plus tax-exempt interest, `agi_ex_ss` = AGI less
+taxable Social Security, or `state_income` = the state's income before its
+deductions; exclusions can only use the first three).
 
 **User overrides.** The app also reads a `taxlaw` folder in the user's
 config directory; a file there replaces the shipped file for that year or
@@ -188,8 +202,9 @@ layer and 0.12 × (12% + 15%) = 3.24% in the senior deduction layer.
 The total line is the sum of the *shown* layers, so turning off the state
 layer gives a federal-only picture.
 
-**Annotations** are cliffs in premiums, not taxes, so they are vertical
-lines rather than part of the rate:
+**Annotations** are cliffs, where a dollar of income costs hundreds or
+thousands of dollars at once, so they are vertical lines rather than part
+of the rate:
 
 * **IRMAA.** Income in year *Y* sets Medicare premiums in *Y + 2*. The line
   sits where MAGI (AGI + tax-exempt interest) crosses each tier for the
@@ -205,6 +220,14 @@ lines rather than part of the rate:
   are off, the 400% subsidy cliff, using ACA MAGI (AGI + tax-exempt
   interest + untaxed Social Security). With benchmark premiums entered,
   the cliff line is labelled with the credit lost there in one dollar.
+* **State tax cliffs.** Where state tax jumps (an exemption, exclusion or
+  credit ends or steps down, such as New Mexico's Social Security
+  exemption above $150K or New Jersey's pension exclusion tiers), the
+  jump is taken out of that step's state rate and drawn as a line
+  labelled with its cost. A step whose state rate tops both neighbours by
+  2 points is searched by bisection for a jump of $1 or more. Lines close
+  together (Connecticut's pension deduction steps) share one label with
+  the count and the total.
 
 **Default visibility** (every item is a checkbox the user can override;
 *Reset to suggested* undoes overrides):
@@ -217,6 +240,7 @@ lines rather than part of the rate:
 | State | a state with an income tax is entered |
 | IRMAA | someone is on Medicare by the premium year (age 63+ now, or Part B enrolled) |
 | ACA | the household buys marketplace coverage and someone is under 65 and not on Medicare |
+| State tax cliffs | the graph has one |
 
 ## Accessibility and CUA
 
@@ -241,9 +265,8 @@ Credits other than education (child, saver's, elderly), detailed itemized
 deductions (SALT cap and phase-out, medical floor, charitable rules; issue
 #27), AMT, QBI, the 0.9% additional Medicare
 tax, self-employment tax, local income taxes, most state credits, and the
-state rules each state file lists under `notes` (income phase-outs of
-state exemptions, cliff-style pension exclusions, special capital gains
-rates), the premium tax credit's repayment rules for
+state rules each state file lists under `notes` (cliff-style pension
+exclusions, special capital gains rates), the premium tax credit's repayment rules for
 advance payments (the credit is worked out on the year's actual MAGI), the qualifying surviving spouse
 filing status (issue #2).
 

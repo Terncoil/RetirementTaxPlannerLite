@@ -6,10 +6,12 @@ draws inside the Qt window and in the headless command-line exporter.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from matplotlib.figure import Figure
 from matplotlib.ticker import FuncFormatter, PercentFormatter
 
-from rtpl.engine.marginal import LAYERS, MarginalSeries
+from rtpl.engine.marginal import LAYERS, Annotation, MarginalSeries
 from rtpl.model.profile import FILING_STATUS_LABELS
 from rtpl.theme import Palette
 
@@ -101,10 +103,29 @@ def render_marginal(
     levels = [0.97, 0.86, 0.75]
     last_x_at_level: dict[int, float] = {}
     min_gap = xs[-1] * 0.09
+    # State cliffs that come in runs (the steps of an exclusion) share one
+    # label: "CT cliffs ×8, +$2,973 tax".
+    labelled: list[Annotation] = []
+    run = 0
+    last_cliff_x = -1e18
     for a in sorted(ann, key=lambda a: a.x):
-        color = palette.irmaa if a.kind == "irmaa" else palette.aca
-        style = (0, (4, 3)) if a.kind == "irmaa" else (0, (1, 2))
+        color = {"irmaa": palette.irmaa, "state_cliff": palette.layers["state"]}.get(a.kind, palette.aca)
+        style = (0, (1, 2)) if a.kind == "aca" else (0, (4, 3))
         ax.axvline(a.x, color=color, linewidth=1.2, linestyle=style)
+        if a.kind == "state_cliff":
+            prev = labelled[-1] if labelled else None
+            if prev is not None and prev.kind == "state_cliff" and a.x - last_cliff_x < min_gap:
+                run += 1
+                total = (prev.annual_cost or 0.0) + (a.annual_cost or 0.0)
+                code = prev.label.split(" ")[0]
+                labelled[-1] = replace(prev, label=f"{code} cliffs ×{run}",
+                                       sublabel=f"+${total:,.0f} tax", annual_cost=total)
+                last_cliff_x = a.x
+                continue
+            run = 1
+            last_cliff_x = a.x
+        labelled.append(a)
+    for a in labelled:
         level = 0
         while level < len(levels) - 1 and a.x - last_x_at_level.get(level, -1e18) < min_gap:
             level += 1
