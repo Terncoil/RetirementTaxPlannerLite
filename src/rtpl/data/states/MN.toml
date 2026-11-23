@@ -8,7 +8,12 @@ year = 2026
 sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
 taxes_social_security = true
 notes = [
-  "Social Security subtraction limits are 2025 values; phase-out approximated as 10% per $4,000.",
+  "Social Security subtraction limits are 2025 values; its phase-out (10% for each $4,000 or part of $4,000 over the limit) is smoothed into a straight line.",
+]
+# Shown under the marginal graph. Remove it if the phase-out below is
+# changed to the exact steps (step = 4000, step_fraction = 0.1).
+chart_notes = [
+  "Social Security subtraction phase-out smoothed (the law takes 10% off for each $4,000 of AGI over the limit, in steps).",
 ]
 
 [brackets]

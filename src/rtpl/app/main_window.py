@@ -66,7 +66,11 @@ from rtpl.taxlaw.loader import TaxLawLibrary
 from rtpl.theme import Theme
 
 APP_NAME = "RetirementTaxPlannerLite"
-ANNOTATION_LABELS = {"irmaa": "IRMAA brackets (Medicare)", "aca": "ACA subsidy cliffs"}
+ANNOTATION_LABELS = {
+    "irmaa": "IRMAA brackets (Medicare)",
+    "aca": "ACA subsidy cliffs",
+    "state_cliff": "State tax cliffs",
+}
 
 
 def config_dir() -> Path:

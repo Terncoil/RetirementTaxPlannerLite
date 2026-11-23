@@ -259,3 +259,24 @@ def test_breakpoints_agree_with_the_steps(lib, name, source):
             continue  # this step straddles a threshold
         for k in LAYERS:
             assert s.layers[k][i] == pytest.approx(inside[-1].rates[k], abs=1e-6)
+
+
+@pytest.mark.parametrize("state", ["MN", "VT"])
+def test_breakpoints_finish_where_a_state_rate_drifts(lib, state):
+    # A married couple with $55K of Social Security: the state's straight-line
+    # phase-out of its Social Security exemption overlaps the federal
+    # phase-in, so the state rate drifts with no exact thresholds. This used
+    # to loop forever and lock up the app.
+    p = Profile(
+        year=2025,
+        filing_status="mfj",
+        state=state,
+        people=[
+            Person(name="A", birth_year=1959, social_security=36_667),
+            Person(name="B", birth_year=1960, social_security=18_333),
+        ],
+    )
+    s = build_marginal_series(p, lib, x_max=250_000, step=100)
+    bps = s.breakpoints()
+    assert all(a.x < b.x for a, b in pairwise(bps))
+    assert len(bps) < 200

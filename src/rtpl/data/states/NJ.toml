@@ -5,12 +5,16 @@
 code = "NJ"
 name = "New Jersey"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)",
+  "NJ Division of Taxation, Retirement Income (pension exclusion), 2025 NJ-1040",
+]
 taxes_social_security = false
 # No deduction for HSA contributions: the state adds them back to income.
 taxes_hsa_contributions = true
 notes = [
-  "Pension/retirement exclusion (income-limited, with a cliff at $150K) not modelled; extra $1,000 exemption at 65+ not modelled.",
+  "Pension/IRA exclusion at 62+: up to $100,000 joint / $75,000 single with total income to $100K, then a share of it to $150K, then none (cliffs). Total income is taken as AGI less taxable Social Security.",
+  "Other retirement income exclusion and extra $1,000 exemption at 65+ not modelled.",
 ]
 
 [brackets]
@@ -23,3 +27,14 @@ mfj    = 0
 
 [exemption]
 per_person = 1000
+
+[[retirement_exclusions]]
+min_age = 62
+per_return = { single = 75000, mfj = 100000, mfs = 50000, hoh = 75000 }
+[retirement_exclusions.phaseout]
+income = "agi_ex_ss"
+tiers = [
+  { up_to = { single = 100000, mfj = 100000 }, keep = 1 },
+  { up_to = { single = 125000, mfj = 125000 }, keep = { single = 0.375, mfj = 0.5, mfs = 0.25 } },
+  { up_to = { single = 150000, mfj = 150000 }, keep = { single = 0.1875, mfj = 0.25, mfs = 0.125 } },
+]

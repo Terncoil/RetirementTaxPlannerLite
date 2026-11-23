@@ -4,18 +4,29 @@ A simplified, data-driven model that covers what matters most for retirees:
 brackets, standard deduction, personal exemptions (as deductions or
 credits), Social Security exemptions, pension/IRA exclusions, an age-based
 deduction, capital gains exclusions or rate caps, and capital-gains-only
-taxes such as Washington's. Local income taxes and most credits are not
-modelled; each state file's ``notes`` say what is left out.
+taxes such as Washington's, and credits. Deductions, exemptions,
+exclusions and credits can shrink with income (``Phaseout``). Local income
+taxes are not modelled; each state file's ``notes`` say what is left out.
 """
 
 from __future__ import annotations
 
 
+import math
+
 from rtpl.model.profile import Profile
-from rtpl.taxlaw.loader import StateLaw, status_key
+from rtpl.taxlaw.loader import Phaseout, StateCredit, StateLaw, status_key
 
 
-def _exempt_social_security(profile: Profile, state: StateLaw, agi: float, taxable_ss: float) -> float:
+def _phased(amount: float, phaseout: Phaseout | None, incomes: dict[str, float], fs: str) -> float:
+    if phaseout is None:
+        return amount
+    return phaseout.apply(amount, incomes[phaseout.income], fs)
+
+
+def _exempt_social_security(
+    profile: Profile, state: StateLaw, agi: float, taxable_ss: float, incomes: dict[str, float] | None = None
+) -> float:
     """Part of federally taxable Social Security the state does not tax."""
     if taxable_ss <= 0:
         return 0.0
@@ -40,16 +51,33 @@ def _exempt_social_security(profile: Profile, state: StateLaw, agi: float, taxab
         else:
             fraction = rule.exempt_fraction_above
         exempt = max(exempt, fraction * taxable_ss)
+    if rule.limited_from_age is not None:
+        total = profile.total("social_security")
+        top = rule.exempt_from_age if rule.exempt_from_age is not None else math.inf
+        if total > 0:
+            share = sum(
+                p.social_security for p in profile.people
+                if rule.limited_from_age <= p.age_in(profile.year) < top
+            ) / total
+            limited = share * taxable_ss
+            if incomes is not None:
+                limited = _phased(limited, rule.limited_phaseout, incomes, fs)
+            exempt = min(taxable_ss, exempt + limited)
     return exempt
 
 
-def _retirement_exclusion(profile: Profile, state: StateLaw, extra_ira: float) -> float:
+def _retirement_exclusion(
+    profile: Profile, state: StateLaw, extra_ira: float, incomes: dict[str, float]
+) -> float:
     """Pension/IRA income excluded, person by person.
 
     Extra ordinary income on the marginal graph counts as Person 1's IRA
-    withdrawal.
+    withdrawal. An exclusion with a ``per_return`` cap shares it between
+    the people on the return; a phase-out scales each person's exclusion.
     """
+    fs = status_key(profile.filing_status)
     total = 0.0
+    return_left = {id(ex): ex.per_return[fs] for ex in state.retirement_exclusions if ex.per_return}
     for i, person in enumerate(profile.people):
         remaining = {
             "pension": person.pension,
@@ -60,15 +88,69 @@ def _retirement_exclusion(profile: Profile, state: StateLaw, extra_ira: float) -
             if age < ex.min_age:
                 continue
             eligible = sum(remaining[k] for k in ex.applies_to if k in remaining)
-            used = min(eligible, ex.amount)
-            total += used
-            # Take the exclusion from the eligible buckets in order.
+            cap = return_left[id(ex)] if ex.per_return else ex.amount
+            used = min(eligible, cap)
+            if ex.per_return:
+                return_left[id(ex)] -= used
+            # Count only the part a phase-out leaves, but use up the
+            # eligible buckets in order as if the whole exclusion applied.
+            total += _phased(used, ex.phaseout, incomes, fs)
             for k in ex.applies_to:
                 if k in remaining and used > 0:
                     take = min(remaining[k], used)
                     remaining[k] -= take
                     used -= take
     return total
+
+
+def _credit_amount(
+    credit: StateCredit,
+    profile: Profile,
+    fs: str,
+    *,
+    federal_deduction: float,
+    state_taxed_ss: float,
+    incomes: dict[str, float],
+) -> float:
+    amount = credit.amount[fs] if credit.amount is not None else 0.0
+    if credit.per_person:
+        amount += credit.per_person * sum(
+            1
+            for p in profile.people
+            if p.age_in(profile.year) >= credit.min_age
+            and (credit.born_before is None or p.birth_year < credit.born_before)
+        )
+    amount += credit.federal_deduction_rate * federal_deduction
+    amount += credit.social_security_rate * state_taxed_ss
+    return _phased(amount, credit.phaseout, incomes, fs)
+
+
+def state_credits(
+    profile: Profile,
+    state: StateLaw,
+    *,
+    federal_deduction: float,
+    state_taxed_ss: float,
+    incomes: dict[str, float],
+) -> float:
+    """Total nonrefundable credits before they are limited to the tax."""
+    fs = status_key(profile.filing_status)
+    total = state.credit_per_person * len(profile.people)
+    if state.exemption_phaseout is not None:
+        total = _phased(total, state.exemption_phaseout, incomes, fs)
+    if state.filer_credit is not None:
+        total += state.filer_credit[fs]
+    best_in_group: dict[str, float] = {}
+    for credit in state.credits:
+        amount = _credit_amount(
+            credit, profile, fs,
+            federal_deduction=federal_deduction, state_taxed_ss=state_taxed_ss, incomes=incomes,
+        )
+        if credit.group is None:
+            total += amount
+        else:
+            best_in_group[credit.group] = max(best_in_group.get(credit.group, 0.0), amount)
+    return total + sum(best_in_group.values())
 
 
 def state_income_tax(
@@ -79,6 +161,8 @@ def state_income_tax(
     taxable_ss: float,
     net_ltcg: float,
     extra_ira: float = 0.0,
+    federal_deduction: float = 0.0,
+    tax_exempt_interest: float = 0.0,
 ) -> tuple[float, float]:
     """Return ``(income_tax, gains_tax)``.
 
@@ -86,22 +170,33 @@ def state_income_tax(
     gains: a gains-only tax (Washington), separate stacked gains rates
     (Montana) or a rate cap on gains (Hawaii). Where a state simply taxes
     gains as regular income, that tax stays in ``income_tax``.
+
+    ``federal_deduction`` is the federal standard or itemized deduction,
+    which some state credits are figured from (Utah's taxpayer credit).
     """
     fs = status_key(profile.filing_status)
     income_tax = gains_tax = 0.0
     if state.has_income_tax:
+        incomes = {
+            "agi": agi,
+            "magi": agi + tax_exempt_interest,
+            "agi_ex_ss": agi - taxable_ss,
+        }
         base = agi
         if state.taxes_hsa_contributions:
             base += profile.household.hsa_deduction
-        base -= _exempt_social_security(profile, state, agi, taxable_ss)
-        base -= _retirement_exclusion(profile, state, extra_ira)
+        ss_exempt = _exempt_social_security(profile, state, agi, taxable_ss, incomes)
+        base -= ss_exempt
+        base -= _retirement_exclusion(profile, state, extra_ira, incomes)
         cg_excluded = state.capital_gains_exclusion * max(0.0, net_ltcg)
         base -= cg_excluded
+        incomes["state_income"] = base
         if state.age_deduction is not None:
             amount, min_age = state.age_deduction
-            base -= amount * sum(1 for a in profile.ages() if a >= min_age)
-        base -= state.standard_deduction[fs]
-        base -= state.exemption_per_person * len(profile.people)
+            age_total = amount * sum(1 for a in profile.ages() if a >= min_age)
+            base -= _phased(age_total, state.age_deduction_phaseout, incomes, fs)
+        base -= _phased(state.standard_deduction[fs], state.standard_deduction_phaseout, incomes, fs)
+        base -= _phased(state.exemption_per_person * len(profile.people), state.exemption_phaseout, incomes, fs)
         base = max(0.0, base)
         sched = state.brackets[fs]
         gains = min(base, max(0.0, net_ltcg) - cg_excluded)
@@ -115,9 +210,12 @@ def state_income_tax(
             income_tax = sched.tax(base)
         for rate, threshold in state.surcharges:
             income_tax += rate * max(0.0, base - threshold)
-        credits = state.credit_per_person * len(profile.people)
-        if state.filer_credit is not None:
-            credits += state.filer_credit[fs]
+        credits = state_credits(
+            profile, state,
+            federal_deduction=federal_deduction,
+            state_taxed_ss=max(0.0, taxable_ss - ss_exempt),
+            incomes=incomes,
+        )
         used = min(credits, income_tax)
         income_tax -= used
         gains_tax = max(0.0, gains_tax - (credits - used))
@@ -131,4 +229,4 @@ def has_state_tax(state: StateLaw | None) -> bool:
     return state is not None and (state.has_income_tax or state.gains_only_tax is not None)
 
 
-__all__ = ["state_income_tax", "has_state_tax"]
+__all__ = ["state_income_tax", "state_credits", "has_state_tax"]

@@ -5,20 +5,40 @@
 code = "UT"
 name = "Utah"
 year = 2026
-sources = ["Tax Foundation, State Individual Income Tax Rates and Brackets, 2026 (Jan 1, 2026)"]
+sources = [
+  "Utah Code 59-10-104 as amended by S.B. 60 (2026): 4.45% from 2026",
+  "Utah Code 59-10-1018 (taxpayer credit) and draft 2026 TC-40 (base phase-out amounts)",
+  "Utah Code 59-10-1042 (Social Security benefits credit), effective Jan 1, 2026",
+  "2025 TC-40 instructions (retirement credit)",
+]
 taxes_social_security = true
 notes = [
-  "Taxpayer credit modelled without its phase-out; Social Security and retirement credits not modelled.",
+  "Taxpayer credit: 6% of the federal standard (or itemized) deduction, less 1.3% of Utah income over the base; the 6% of dependents' exemptions is not modelled.",
+  "Social Security credit and retirement credit (born before 1953) both phase out at 2.5 cents per dollar of income over their limits; only the larger counts.",
 ]
 
 [brackets]
-single = [[0, 0.045]]
-mfj    = [[0, 0.045]]
+single = [[0, 0.0445]]
+mfj    = [[0, 0.0445]]
 
 [standard_deduction]
 single = 0
 mfj    = 0
 
-[filer_credit]
-single = 966
-mfj    = 1932
+[[credits]]
+name = "Taxpayer credit"
+federal_deduction_rate = 0.06
+phaseout = { start = { single = 18696, mfj = 37392, hoh = 28045 }, rate = 0.013, income = "state_income" }
+
+[[credits]]
+name = "Social Security benefits credit"
+social_security_rate = 0.0445
+group = "retirement"
+phaseout = { start = { single = 54000, mfj = 90000, hoh = 90000, mfs = 45000 }, rate = 0.025, income = "magi" }
+
+[[credits]]
+name = "Retirement credit"
+per_person = 450
+born_before = 1953
+group = "retirement"
+phaseout = { start = { single = 25000, mfj = 32000, hoh = 32000, mfs = 16000 }, rate = 0.025, income = "magi" }
