@@ -149,7 +149,9 @@ class MarginalSeries:
                         a = m
                     else:
                         b = m
-                k = round(b, 2)
+                # Always move forward, even when the rate drifts so fast that
+                # the bisection ends within a cent of where it started.
+                k = max(round(b, 2), round(lo + 0.01, 2))
                 cur = rates(k, min(k + probe, x_end))
                 cur_x = lo = k
                 if not _same_rates(cur, out[-1].rates):
@@ -285,7 +287,11 @@ def _layer_rates(
 # The premium tax credit's rate drifts continuously across each income
 # band (the expected share of income rises in a straight line), so it has
 # no exact thresholds: a new breakpoint starts once it moves a whole point.
-_DRIFT_TOL = {"ptc": 0.01}
+# A state rate drifts too where a straight-line phase-out of a Social
+# Security exemption (Minnesota, Vermont) overlaps the federal phase-in of
+# taxable Social Security: there a breakpoint starts once it moves a tenth
+# of a point.
+_DRIFT_TOL = {"ptc": 0.01, "state": 0.001}
 
 
 def _same_rates(r1: dict[str, float], r2: dict[str, float], tol: float = 1e-6) -> bool:
