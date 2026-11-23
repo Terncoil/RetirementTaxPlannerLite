@@ -1194,6 +1194,11 @@ class AssumptionsForm(ItemForm):
         self.spending = self.row("Yearly spending", money_box(), "In today's dollars; grows with inflation")
         self.survivor = self.row("Spending after the first death", percent_box(0, 200, 5),
                                  "The survivor's spending, as a share of the couple's")
+        self.health = self.row("ACA premium growth", percent_box(-5, 20),
+                               "Yearly growth of the ACA marketplace premiums on the Baseline\n"
+                               "tab (usually faster than inflation). The plan pays the net\n"
+                               "premium (premium less the premium tax credit) until Medicare,\n"
+                               "so leave those premiums out of spending.")
         self.order = self.row("Pay for spending from", SpendingOrderEdit(),
                               "When income falls short, money comes from the ticked account\n"
                               "types, top first (several accounts of one type: in list order).\n"
@@ -1207,7 +1212,7 @@ class AssumptionsForm(ItemForm):
         self.magi2 = self.row("IRMAA MAGI last year", money_box(), magi_tip)
         for box in (self.magi1, self.magi2):
             box.setSpecialValueText("Not entered")
-        self.watch(self.cola, self.ret, self.cash, self.spending, self.survivor, self.order, self.magi1,
+        self.watch(self.cola, self.ret, self.cash, self.spending, self.survivor, self.health, self.order, self.magi1,
                    self.magi2)
 
     def fill(self) -> None:
@@ -1218,6 +1223,7 @@ class AssumptionsForm(ItemForm):
         self.cash.setValue(100 * a.cash_return)
         self.spending.setValue(a.spending)
         self.survivor.setValue(100 * a.survivor_spending_pct)
+        self.health.setValue(100 * a.health_premium_growth)
         self.order.set_value(a.spending_order)
         self.magi1.setValue(a.prior_magi.get(str(y - 2), 0))
         self.magi2.setValue(a.prior_magi.get(str(y - 1), 0))
@@ -1233,6 +1239,7 @@ class AssumptionsForm(ItemForm):
         a.cash_return = self.cash.value() / 100
         a.spending = self.spending.value()
         a.survivor_spending_pct = self.survivor.value() / 100
+        a.health_premium_growth = self.health.value() / 100
         a.spending_order = self.order.value()
         for year, box in ((y - 2, self.magi1), (y - 1, self.magi2)):
             if box.value():

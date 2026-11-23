@@ -22,6 +22,13 @@ FILING_STATUS_LABELS = {
 }
 
 
+ACA_PLAN_TIERS = {
+    "bronze": "Bronze",
+    "silver": "Silver",
+    "gold": "Gold or Platinum",
+}
+
+
 @dataclass
 class Person:
     name: str = "Person 1"
@@ -39,6 +46,12 @@ class Person:
     wages: float = 0.0
     pension: float = 0.0
     ira_distributions: float = 0.0  # traditional IRA / 401(k), taxable part
+    # ACA marketplace coverage for this person, as monthly premiums before
+    # any subsidy: the benchmark (second-lowest-cost Silver) plan, which
+    # sets the premium tax credit, and the plan they would buy (0 = the
+    # benchmark). Used only while they are not on Medicare.
+    aca_benchmark_premium: float = 0.0
+    aca_plan_premium: float = 0.0
 
     def age_in(self, year: int) -> int:
         """Age at the end of ``year`` (what the IRS uses for 65+ tests)."""
@@ -70,6 +83,18 @@ class Household:
     itemized_deductions: float = 0.0  # 0 = take the standard deduction
     has_taxable_brokerage: bool = False
     aca_marketplace: bool = False  # someone buys ACA marketplace coverage
+    # Metal tier of the plan bought on the marketplace: cost-sharing
+    # reductions (the 250% FPL line) only come with a Silver plan.
+    aca_plan_tier: str = "silver"
+    # Education credits: students in their first four years of college
+    # (American Opportunity credit), each one's qualified expenses, and
+    # expenses for the Lifetime Learning credit (other students, such as
+    # graduate school). The forward plan claims them through
+    # ``education_last_year`` (None = the profile's year only).
+    aotc_students: int = 0
+    aotc_expenses_per_student: float = 4000.0
+    llc_expenses: float = 0.0
+    education_last_year: int | None = None
     household_size: int | None = None  # for FPL; None = number of people
 
 
@@ -129,4 +154,6 @@ class Profile:
             problems.append("Married filing statuses need two people")
         if self.filing_status in ("single", "hoh", "qss") and len(self.people) != 1:
             problems.append("This filing status takes one person")
+        if self.household.aca_plan_tier not in ACA_PLAN_TIERS:
+            problems.append(f"Unknown ACA plan tier {self.household.aca_plan_tier!r}")
         return problems

@@ -15,6 +15,8 @@ from rtpl.theme import Palette
 
 
 def _money(v: float, _pos=None) -> str:
+    if v < 0:
+        return "-" + _money(-v)
     if abs(v) >= 1000:
         return f"${v / 1000:,.0f}K"
     return f"${v:,.0f}"
@@ -40,27 +42,39 @@ def render_marginal(
 
     xs = list(series.x) + [series.x[-1] + series.step]
     shown = [k for k in LAYERS if visibility.get(k, False)]
-    bottom = [0.0] * len(series.x)
+    # Positive rates stack up from 0% and negative ones (a nonrefundable
+    # credit absorbing tax) stack down from it, so a band never hides
+    # another and the total line is their sum.
+    up = [0.0] * len(series.x)
+    down = [0.0] * len(series.x)
     handles = []
     for key in shown:
         vals = series.layers[key]
-        top = [b + v for b, v in zip(bottom, vals)]
-        h = ax.fill_between(
-            xs,
-            bottom + [bottom[-1]],
-            top + [top[-1]],
-            step="post",
-            color=palette.layers[key],
-            linewidth=0.6,
-            edgecolor=palette.surface,  # thin surface gap between bands
-            label=series.layer_label(key),
-        )
-        handles.append(h)
-        bottom = top
+        drawn = None
+        for sign, base in ((1, up), (-1, down)):
+            part = [max(0.0, v) if sign > 0 else min(0.0, v) for v in vals]
+            if not any(abs(v) > 1e-9 for v in part):
+                continue
+            top = [b + v for b, v in zip(base, part)]
+            drawn = ax.fill_between(
+                xs,
+                base + [base[-1]],
+                top + [top[-1]],
+                step="post",
+                color=palette.layers[key],
+                linewidth=0.6,
+                edgecolor=palette.surface,  # thin surface gap between bands
+                label=series.layer_label(key),
+            )
+            base[:] = top
+        if drawn is None:  # shown but zero everywhere: still in the legend
+            drawn = ax.fill_between(xs, [0.0] * len(xs), [0.0] * len(xs), step="post",
+                                    color=palette.layers[key], label=series.layer_label(key))
+        handles.append(drawn)
 
     # The total follows what is shown, so hiding the state layer gives a
     # federal-only total.
-    hidden_total = bottom
+    hidden_total = [u + d for u, d in zip(up, down)]
     if show_total and shown:
         (line,) = ax.step(
             xs,
@@ -72,8 +86,11 @@ def render_marginal(
         )
         handles.append(line)
 
-    ymax = max(max(hidden_total, default=0), max(bottom, default=0))
-    ax.set_ylim(min(0, min(hidden_total, default=0)) - 0.01, max(0.10, ymax * 1.18 + 0.02))
+    ymax = max(max(hidden_total, default=0), max(up, default=0))
+    ymin = min(min(down, default=0), min(hidden_total, default=0))
+    ax.set_ylim(min(0, ymin * 1.1) - 0.01, max(0.10, ymax * 1.18 + 0.02))
+    if ymin < -1e-9:
+        ax.axhline(0, color=palette.text_secondary, linewidth=0.8)
     ax.set_xlim(0, xs[-1])
     ax.yaxis.set_major_formatter(PercentFormatter(1.0, decimals=0))
     ax.xaxis.set_major_formatter(FuncFormatter(_money))

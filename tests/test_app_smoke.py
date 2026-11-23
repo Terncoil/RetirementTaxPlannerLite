@@ -430,3 +430,24 @@ def test_clicking_a_bar_shows_its_breakdown(window):
     assert (not view.popups[1].isHidden()) and "Total tax" in view.popups[1].text()
     view.tabs.setCurrentWidget(view.bal_canvas)
     assert not (not view.popups[1].isHidden())
+
+
+def test_aca_and_education_fields_round_trip(window, tmp_path):
+    from rtpl.model.profile import Profile
+
+    path = Path("examples/profiles/early_retirees_college_aca.json")
+    original = Profile.load(path)
+    window._load_profile(original, path)
+    window.recompute()
+    p = window.form.profile()
+    assert p.people[0].aca_benchmark_premium == 1100 and p.people[0].aca_plan_premium == 800
+    h = p.household
+    assert (h.aca_plan_tier, h.aotc_students, h.aotc_expenses_per_student, h.education_last_year) == (
+        "bronze", 2, 4000, 2028)
+    for key in ("edu", "nonref", "ptc"):
+        assert window.checks[key].isChecked()
+    assert window.figure.axes[0].get_ylim()[0] < 0
+    # "This year only" is the lowest value and saves as None.
+    window.form.education_last.setValue(window.form.education_last.minimum())
+    assert window.form.profile().household.education_last_year is None
+    assert window.form.education_last.text() == "This year only"

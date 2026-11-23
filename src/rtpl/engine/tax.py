@@ -12,9 +12,14 @@ What is modelled for the marginal graph:
   * qualified dividends and long-term gains stacked on ordinary income
   * Net Investment Income Tax
   * an optional state layer (bracketed or flat, with SS / retirement exemptions)
+  * education credits (American Opportunity and Lifetime Learning), with
+    the nonrefundable part limited to income tax and the refundable part
+    paid regardless
+  * the ACA premium tax credit, from each person's benchmark premium (a
+    premium subsidy rather than tax, so it is kept out of ``federal_tax``)
 
-What is not modelled yet: credits, AMT, QBI, the 0.9% additional Medicare
-tax, self-employment tax, state credits.
+What is not modelled yet: other credits, AMT, QBI, the 0.9% additional
+Medicare tax, self-employment tax, state credits.
 """
 
 from __future__ import annotations
@@ -75,10 +80,33 @@ class TaxResult:
     niit: float
     state_tax: float  # all state tax, including state_gains_tax
     state_gains_tax: float = 0.0  # under the state's separate capital gains rules
+    # credits
+    nonrefundable_credits: float = 0.0  # education credits allowed before the tax limit
+    nonrefundable_used: float = 0.0  # the part income tax was large enough to use
+    refundable_credits: float = 0.0  # refundable part of the American Opportunity credit
+    # ACA marketplace: yearly premiums for the plans bought (before any
+    # subsidy) and the premium tax credit that pays part of them
+    aca_premium: float = 0.0
+    aca_ptc: float = 0.0
+
+    @property
+    def income_tax_before_credits(self) -> float:
+        """Regular income tax, the tax nonrefundable credits can offset."""
+        return self.ordinary_tax + self.capital_gains_tax
+
+    @property
+    def credits(self) -> float:
+        return self.nonrefundable_used + self.refundable_credits
 
     @property
     def federal_tax(self) -> float:
-        return self.ordinary_tax + self.capital_gains_tax + self.niit
+        """Federal income tax and NIIT, less credits (negative when a
+        refundable credit is more than the tax)."""
+        return self.ordinary_tax + self.capital_gains_tax + self.niit - self.credits
+
+    @property
+    def aca_net_premium(self) -> float:
+        return self.aca_premium - self.aca_ptc
 
     @property
     def total_tax(self) -> float:
@@ -113,6 +141,84 @@ def senior_deduction(profile: Profile, law: FederalLaw, magi: float) -> float:
     return max(0.0, eligible * law.senior_amount - cut)
 
 
+def _phaseout_keep(magi: float, start: float, width: float) -> float:
+    """Share of a credit left after a straight-line phase-out."""
+    if width <= 0:
+        return 1.0 if magi <= start else 0.0
+    return max(0.0, min(1.0, 1.0 - (magi - start) / width))
+
+
+def education_credits(profile: Profile, law: FederalLaw, magi: float) -> tuple[float, float]:
+    """(nonrefundable, refundable) education credits after the MAGI phase-out.
+
+    The American Opportunity credit is per student (40% refundable); the
+    Lifetime Learning credit is per return and nonrefundable. Their MAGI
+    is AGI for anyone without foreign income.
+    """
+    h = profile.household
+    ed = law.education
+    if ed is None or (h.aotc_students <= 0 and h.llc_expenses <= 0):
+        return 0.0, 0.0
+    if h.education_last_year is not None and profile.year > h.education_last_year:
+        return 0.0, 0.0
+    fs = status_key(profile.filing_status)
+    if fs == "mfs" and not ed.mfs_eligible:
+        return 0.0, 0.0
+    exp = max(0.0, h.aotc_expenses_per_student)
+    each = min(exp, ed.aotc_full_expenses) + ed.aotc_partial_rate * min(
+        max(0.0, exp - ed.aotc_full_expenses), ed.aotc_partial_expenses
+    )
+    aotc = max(0, h.aotc_students) * each
+    aotc *= _phaseout_keep(magi, ed.aotc_phaseout_start[fs], ed.aotc_phaseout_width[fs])
+    llc = ed.llc_rate * min(max(0.0, h.llc_expenses), ed.llc_expense_limit)
+    llc *= _phaseout_keep(magi, ed.llc_phaseout_start[fs], ed.llc_phaseout_width[fs])
+    refundable = ed.aotc_refundable_share * aotc
+    return aotc - refundable + llc, refundable
+
+
+def aca_premiums(profile: Profile) -> tuple[float, float]:
+    """Yearly (benchmark, plan) premiums of the people on marketplace coverage
+    (everyone with a benchmark premium who isn't on Medicare)."""
+    if not profile.household.aca_marketplace:
+        return 0.0, 0.0
+    bench = plan = 0.0
+    for p in profile.people:
+        if p.aca_benchmark_premium <= 0 or p.on_medicare(profile.year):
+            continue
+        bench += 12 * p.aca_benchmark_premium
+        plan += 12 * (p.aca_plan_premium if p.aca_plan_premium > 0 else p.aca_benchmark_premium)
+    return bench, plan
+
+
+def premium_tax_credit(profile: Profile, law: FederalLaw, magi: float, *, continuous: bool = False) -> float:
+    """The ACA premium tax credit for the year at ``magi`` (the ACA MAGI).
+
+    The credit is the benchmark premium less the applicable percentage of
+    MAGI, but no more than the premium of the plan bought. Below 100% of
+    the poverty line there is no credit, and without the enhanced credits
+    none above the 400% cliff either. ``continuous`` leaves out those two
+    jumps (MAGI is held at the cliff above it) so the marginal graph can
+    draw the gradual phase-out as a rate; the jumps are drawn as lines.
+    """
+    bench, plan = aca_premiums(profile)
+    if bench <= 0 or law.aca_applicable is None:
+        return 0.0
+    if status_key(profile.filing_status) == "mfs":
+        return 0.0  # married filing separately can't claim it (outside rare exceptions)
+    fpl = law.fpl(profile.fpl_household_size())
+    cliff = law.aca_cliff_pct * fpl
+    if continuous:
+        if not law.aca_enhanced_subsidies:
+            magi = min(magi, cliff)
+    else:
+        if magi < fpl:
+            return 0.0
+        if not law.aca_enhanced_subsidies and magi > cliff:
+            return 0.0
+    pct = law.applicable_percentage(max(0.0, magi) / fpl)
+    return max(0.0, min(plan, bench - pct * max(0.0, magi)))
+
+
 def _standard_deduction(profile: Profile, law: FederalLaw) -> float:
     fs = status_key(profile.filing_status)
     extra_each = law.additional_std_married if profile.married or fs == "mfj" else law.additional_std_unmarried
@@ -130,11 +236,12 @@ def compute_tax(
     source: IncomeSource = IncomeSource.ORDINARY,
     taxable_ss_override: float | None = None,
     senior_deduction_override: float | None = None,
+    nonrefundable_override: float | None = None,
 ) -> TaxResult:
     """Tax for ``profile`` plus ``extra`` dollars of ``source`` income.
 
-    The two overrides freeze an intermediate quantity; the marginal engine
-    uses them to split a change in ordinary tax into its causes.
+    The overrides freeze an intermediate quantity; the marginal engine
+    uses them to split a change in tax into its causes.
     """
     h = profile.household
     fs = status_key(profile.filing_status)
@@ -191,6 +298,15 @@ def compute_tax(
     )
     niit = law.niit_rate * max(0.0, min(nii, agi - law.niit_threshold[fs]))
 
+    nonref, refundable = education_credits(profile, law, agi)
+    if nonrefundable_override is not None:
+        nonref = nonrefundable_override
+    used = min(nonref, ordinary_tax + cg_tax)
+
+    magi_aca = agi + h.tax_exempt_interest + (ss - taxable_ss)
+    _, plan_premium = aca_premiums(profile)
+    ptc = premium_tax_credit(profile, law, magi_aca) if plan_premium else 0.0
+
     state_tax = state_gains_tax = 0.0
     if state is not None:
         state_income, state_gains_tax = state_income_tax(
@@ -207,7 +323,7 @@ def compute_tax(
         taxable_social_security=taxable_ss,
         agi=agi,
         magi_irmaa=agi + h.tax_exempt_interest,
-        magi_aca=agi + h.tax_exempt_interest + (ss - taxable_ss),
+        magi_aca=magi_aca,
         deduction=deduction,
         senior_deduction=senior,
         taxable_income=taxable,
@@ -217,4 +333,9 @@ def compute_tax(
         niit=niit,
         state_tax=state_tax,
         state_gains_tax=state_gains_tax,
+        nonrefundable_credits=nonref,
+        nonrefundable_used=used,
+        refundable_credits=refundable,
+        aca_premium=plan_premium,
+        aca_ptc=ptc,
     )

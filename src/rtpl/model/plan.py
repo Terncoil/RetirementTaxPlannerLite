@@ -410,6 +410,9 @@ class Assumptions:
     # Account types that pay for spending when income falls short, in order.
     spending_order: list[str] = field(default_factory=lambda: list(DEFAULT_SPENDING_ORDER))
     prior_magi: dict[str, float] = field(default_factory=dict)  # {"2025": 180000} for IRMAA
+    # Yearly growth of ACA marketplace premiums (the baseline's benchmark
+    # and plan premiums), usually faster than inflation.
+    health_premium_growth: float = 0.05
 
 
 @dataclass

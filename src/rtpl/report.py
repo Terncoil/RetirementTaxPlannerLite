@@ -18,7 +18,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.figure import Figure
 
 from rtpl import __version__
-from rtpl.model.profile import FILING_STATUS_LABELS, Profile
+from rtpl.model.profile import ACA_PLAN_TIERS, FILING_STATUS_LABELS, Profile
 
 PORTRAIT = (8.5, 11.0)  # US Letter, inches
 LANDSCAPE = (11.0, 8.5)
@@ -77,6 +77,10 @@ def profile_sections(profile: Profile, *, state_name: str | None = None) -> list
             rows.append(("On Medicare Part B", "Yes" if person.medicare_part_b else "No"))
         if person.blind:
             rows.append(("Blind", "Yes"))
+        if person.aca_benchmark_premium:
+            rows.append(("ACA benchmark Silver", f"{_money(person.aca_benchmark_premium)}/month"))
+            if person.aca_plan_premium:
+                rows.append(("ACA plan premium", f"{_money(person.aca_plan_premium)}/month"))
         sections.append(Section(person.name, rows))
     h = profile.household
     rows = [(label, _money(getattr(h, key))) for key, label in HOUSEHOLD_LABELS.items() if getattr(h, key)]
@@ -85,7 +89,14 @@ def profile_sections(profile: Profile, *, state_name: str | None = None) -> list
     if h.has_taxable_brokerage:
         rows.append(("Taxable brokerage account", "Yes"))
     if h.aca_marketplace:
-        rows.append(("ACA marketplace coverage", "Yes"))
+        rows.append(("ACA marketplace coverage", f"Yes ({ACA_PLAN_TIERS.get(h.aca_plan_tier, h.aca_plan_tier)})"))
+    if h.aotc_students:
+        rows.append(("College students (AOTC)",
+                     f"{h.aotc_students}, {_money(h.aotc_expenses_per_student)} expenses each"))
+    if h.llc_expenses:
+        rows.append(("Lifetime Learning expenses", _money(h.llc_expenses)))
+    if (h.aotc_students or h.llc_expenses) and h.education_last_year:
+        rows.append(("Education credits through", str(h.education_last_year)))
     if h.household_size:
         rows.append(("Household size", str(h.household_size)))
     sections.append(Section("Household", rows))

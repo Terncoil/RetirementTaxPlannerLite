@@ -150,6 +150,13 @@ class FederalLaw:
     hsa_self_only: float | None = None
     hsa_family: float | None = None
     hsa_catch_up: float = 1000.0
+    # ACA premium tax credit applicable percentage table (IRC 36B(b)(3)):
+    # (FPL ratio where the band starts, initial %, final %), sorted. Inside a
+    # band the percentage rises in a straight line; past the last start it
+    # stays at that row's final %. None = not in the file (no credit shown).
+    aca_applicable: tuple[tuple[float, float, float], ...] | None = None
+    # Education credits (IRC 25A). None = not in the file (no credits).
+    education: "EducationCredits | None" = None
 
     @property
     def senior_deduction_active(self) -> bool:
@@ -160,6 +167,63 @@ class FederalLaw:
 
     def fpl(self, household_size: int) -> float:
         return self.aca_fpl_first + self.aca_fpl_additional * max(0, household_size - 1)
+
+    def applicable_percentage(self, fpl_ratio: float) -> float:
+        """Share of income a household is expected to pay toward the benchmark
+        plan, at ``fpl_ratio`` (income / poverty line, 2.5 = 250%)."""
+        rows = self.aca_applicable or ()
+        if not rows:
+            return 0.0
+        pct = rows[0][1]
+        for i, (start, initial, final) in enumerate(rows):
+            if fpl_ratio < start:
+                break
+            nxt = rows[i + 1][0] if i + 1 < len(rows) else None
+            if nxt is None or nxt <= start:
+                pct = final
+            else:
+                t = min(1.0, (fpl_ratio - start) / (nxt - start))
+                pct = initial + (final - initial) * t
+        return pct
+
+
+@dataclass(frozen=True)
+class EducationCredits:
+    """American Opportunity (AOTC) and Lifetime Learning (LLC) credits."""
+
+    aotc_full_expenses: float  # first slice of expenses credited at 100%
+    aotc_partial_expenses: float  # next slice, credited at aotc_partial_rate
+    aotc_partial_rate: float
+    aotc_refundable_share: float  # share of the AOTC paid even with no tax
+    aotc_phaseout_start: dict[str, float]
+    aotc_phaseout_width: dict[str, float]
+    llc_rate: float
+    llc_expense_limit: float  # per return
+    llc_phaseout_start: dict[str, float]
+    llc_phaseout_width: dict[str, float]
+    mfs_eligible: bool = False
+
+    @property
+    def aotc_max(self) -> float:
+        return self.aotc_full_expenses + self.aotc_partial_rate * self.aotc_partial_expenses
+
+
+def _parse_education(raw: dict | None) -> EducationCredits | None:
+    if not raw:
+        return None
+    return EducationCredits(
+        aotc_full_expenses=float(raw["aotc_full_expenses"]),
+        aotc_partial_expenses=float(raw["aotc_partial_expenses"]),
+        aotc_partial_rate=float(raw["aotc_partial_rate"]),
+        aotc_refundable_share=float(raw["aotc_refundable_share"]),
+        aotc_phaseout_start=_by_status(raw["aotc_phaseout_start"]),
+        aotc_phaseout_width=_by_status(raw["aotc_phaseout_width"]),
+        llc_rate=float(raw["llc_rate"]),
+        llc_expense_limit=float(raw["llc_expense_limit"]),
+        llc_phaseout_start=_by_status(raw["llc_phaseout_start"]),
+        llc_phaseout_width=_by_status(raw["llc_phaseout_width"]),
+        mfs_eligible=bool(raw.get("mfs_eligible", False)),
+    )
 
 
 def _parse_federal(raw: dict) -> FederalLaw:
@@ -219,6 +283,11 @@ def _parse_federal(raw: dict) -> FederalLaw:
         hsa_self_only=float(hsa["self_only"]) if "self_only" in hsa else None,
         hsa_family=float(hsa["family"]) if "family" in hsa else None,
         hsa_catch_up=float(hsa.get("catch_up", 1000)),
+        aca_applicable=(
+            tuple(sorted((float(a), float(b), float(c)) for a, b, c in aca["applicable_percentage"]))
+            if "applicable_percentage" in aca else None
+        ),
+        education=_parse_education(raw.get("education_credits")),
     )
 
 

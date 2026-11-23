@@ -13,18 +13,28 @@ layers always add up exactly to the true change in total tax:
                 0% band by the added ordinary income itself
 * ``senior``    extra federal income tax because the senior deduction shrank
                 (again including gains it pushes out of the 0% band)
+* ``edu``       education credits lost to their MAGI phase-out (both the
+                nonrefundable and refundable parts)
 * ``niit``      Net Investment Income Tax
 * ``state``     state income tax
 * ``state_cg``  state tax under separate capital gains rules (Washington's
                 gains tax, Montana's gains rates, Hawaii's gains rate cap)
+* ``ptc``       ACA premium tax credit lost to its gradual phase-out (a
+                premium subsidy rather than a tax, but each dollar of income
+                costs it the same way)
+* ``nonref``    a negative layer: tax that an unused nonrefundable credit
+                absorbs. With income tax below the credit, the ordinary
+                layer still shows the bracket rate and this cancels it, so
+                the total is 0% until the credit is used up.
 
 So the capital gains layer stays at the statutory 0/15/20% on the added
 income; the knock-on effects of the Social Security and senior deduction
 phase-ins are charged to those layers, where they come from.
 
-IRMAA and ACA are cliffs in premiums rather than taxes, so they are
-returned as annotations (where along the X axis each threshold is crossed)
-instead of being folded into the rate.
+IRMAA and the ACA thresholds are cliffs in premiums rather than taxes, so
+they are returned as annotations (where along the X axis each threshold is
+crossed) instead of being folded into the rate. The ACA 400% line carries
+the subsidy lost there; the gradual phase-out below it is the ``ptc`` layer.
 """
 
 from __future__ import annotations
@@ -35,9 +45,10 @@ from dataclasses import dataclass, field
 from rtpl.model.profile import Profile
 from rtpl.taxlaw.loader import FederalLaw, StateLaw, TaxLawLibrary, status_key
 
-from .tax import IncomeSource, TaxResult, compute_tax
+from .tax import IncomeSource, TaxResult, aca_premiums, compute_tax, premium_tax_credit
 
-LAYERS = ("ordinary", "ss", "cg", "senior", "niit", "state", "state_cg")  # stack order, bottom up
+# Stack order, bottom up. Negative rates (the nonref layer) stack down from 0.
+LAYERS = ("ordinary", "ss", "cg", "senior", "edu", "niit", "state", "state_cg", "ptc", "nonref")
 ANNOTATIONS = ("irmaa", "aca")
 
 LAYER_LABELS = {
@@ -45,9 +56,12 @@ LAYER_LABELS = {
     "ss": "Social Security Taxation Phase-In",
     "senior": "Enhanced Senior Deduction Phase-Out",
     "cg": "Capital Gains and Qualified Dividends Tax",
+    "edu": "Education Credit Phase-Out",
     "niit": "Net Investment Income Tax",
     "state": "State Tax",
     "state_cg": "State CG&QD Tax",
+    "ptc": "ACA Premium Tax Credit Phase-Out",
+    "nonref": "Nonrefundable Credit Absorbing Tax",
 }
 
 
@@ -244,6 +258,16 @@ def _layer_rates(
     def income_tax(r: TaxResult) -> float:
         return r.ordinary_tax + r.capital_gains_tax
 
+    # Nonrefundable credits: the part used changes because the tax changed
+    # (credit held at xa: the nonref layer) or the credit phased out (edu).
+    ca, la, lb = a.nonrefundable_credits, income_tax(a), income_tax(b)
+    absorbed = min(ca, lb) - min(ca, la)
+    phased = (b.nonrefundable_used - min(ca, lb)) + (b.refundable_credits - a.refundable_credits)
+    ptc = 0.0
+    if a.aca_premium or b.aca_premium:
+        ptc = (premium_tax_credit(profile, law, b.magi_aca, continuous=True)
+               - premium_tax_credit(profile, law, a.magi_aca, continuous=True))
+
     return {
         "ordinary": (frozen_both.ordinary_tax - a.ordinary_tax) / width,
         "cg": (frozen_both.capital_gains_tax - a.capital_gains_tax) / width,
@@ -252,11 +276,20 @@ def _layer_rates(
         "niit": (b.niit - a.niit) / width,
         "state": ((b.state_tax - b.state_gains_tax) - (a.state_tax - a.state_gains_tax)) / width,
         "state_cg": (b.state_gains_tax - a.state_gains_tax) / width,
+        "edu": -phased / width,
+        "nonref": -absorbed / width,
+        "ptc": -ptc / width,
     }
 
 
+# The premium tax credit's rate drifts continuously across each income
+# band (the expected share of income rises in a straight line), so it has
+# no exact thresholds: a new breakpoint starts once it moves a whole point.
+_DRIFT_TOL = {"ptc": 0.01}
+
+
 def _same_rates(r1: dict[str, float], r2: dict[str, float], tol: float = 1e-6) -> bool:
-    return all(abs(r1[k] - r2[k]) <= tol for k in LAYERS)
+    return all(abs(r1[k] - r2[k]) <= _DRIFT_TOL.get(k, tol) for k in LAYERS)
 
 
 # -- annotations -------------------------------------------------------------
@@ -359,24 +392,38 @@ def aca_annotations(series: MarginalSeries) -> list[Annotation]:
     magi = [r.magi_aca for r in series.results]
     marks = [
         (law.aca_medicaid_pct, "Medicaid 138%", "Medicaid eligibility ends (expansion states) at {pct:.0%} FPL, MAGI ${t:,.0f}"),
-        (law.aca_csr_pct, "CSR 250%", "Cost-sharing reductions end at {pct:.0%} FPL, MAGI ${t:,.0f}"),
     ]
+    if profile.household.aca_plan_tier == "silver":
+        marks.append(
+            (law.aca_csr_pct, "CSR 250%", "Cost-sharing reductions (Silver plans) end at {pct:.0%} FPL, MAGI ${t:,.0f}")
+        )
     if not law.aca_enhanced_subsidies:
         marks.append(
             (law.aca_cliff_pct, "ACA cliff 400%",
              "ACA premium tax credit ends entirely above {pct:.0%} FPL, MAGI ${t:,.0f}")
         )
+    bench, _ = aca_premiums(profile)
     out = []
     for pct, label, text in marks:
         t = pct * fpl
         x = _crossing(grid, magi, t, strict=True)
         if x is None:
             continue
-        out.append(Annotation(kind="aca", x=x, magi=t, label=label, detail=text.format(pct=pct, t=t)))
+        detail = text.format(pct=pct, t=t)
+        cost = None
+        sub = ""
+        if pct == law.aca_cliff_pct and bench > 0 and law.aca_applicable is not None:
+            cost = premium_tax_credit(profile, law, t, continuous=True)
+            sub = f"-${cost:,.0f} subsidy"
+            detail += f": about ${cost:,.0f}/yr of premium tax credit lost in one dollar"
+        out.append(Annotation(kind="aca", x=x, magi=t, label=label, detail=detail,
+                              annual_cost=cost, sublabel=sub))
     if law.aca_enhanced_subsidies:
         series.notes.append(
             f"Enhanced ACA credits apply in {law.year}: no 400% FPL subsidy cliff."
         )
+    if bench > 0 and law.aca_applicable is None:
+        series.notes.append(f"No ACA applicable percentage table for {law.year}: premium tax credit not shown.")
     return out
 
 

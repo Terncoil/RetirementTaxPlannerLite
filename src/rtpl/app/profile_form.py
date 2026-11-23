@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from rtpl.app.inputs import ComboBox, DoubleSpinBox, SpinBox
-from rtpl.model.profile import FILING_STATUS_LABELS, Household, Person, Profile
+from rtpl.model.profile import ACA_PLAN_TIERS, FILING_STATUS_LABELS, Household, Person, Profile
 
 PERSON_MONEY = [
     ("social_security", "Social Security"),
@@ -39,6 +39,20 @@ HOUSEHOLD_MONEY = [
     ("other_investment_income", "Rental / passive income"),
     ("adjustments", "Above-the-line adjustments"),
     ("itemized_deductions", "Itemized deductions"),
+]
+
+# Monthly ACA marketplace premiums, per person.
+PERSON_ACA = [
+    ("aca_benchmark_premium", "ACA benchmark Silver (monthly)",
+     "This person's monthly premium for the benchmark plan: the\n"
+     "second-lowest-cost Silver plan, before any subsidy. Healthcare.gov's\n"
+     "window shopping shows it. The premium tax credit is worked out from\n"
+     "it whatever plan you buy. Leave at $0 if not on the marketplace;\n"
+     "it stops at Medicare (65)."),
+    ("aca_plan_premium", "ACA plan you'd buy (monthly)",
+     "Monthly premium, before any subsidy, of the plan this person would\n"
+     "buy (for example a Bronze plan). The credit can't be more than it.\n"
+     "Leave at $0 to use the benchmark premium."),
 ]
 
 MONEY_TIPS = {
@@ -125,6 +139,12 @@ class PersonBox(QGroupBox):
             box = money_box()
             self.money[key] = box
             _add_row(form, text, box, MONEY_TIPS.get(key))
+            box.valueChanged.connect(self.changed)
+        for key, text, tip in PERSON_ACA:
+            box = money_box()
+            box.setSingleStep(50)
+            self.money[key] = box
+            _add_row(form, text, box, tip)
             box.valueChanged.connect(self.changed)
         self.name.textChanged.connect(self.changed)
         self.birth_year.valueChanged.connect(self.changed)
@@ -227,10 +247,44 @@ class ProfileForm(QWidget):
         self.household_size.setRange(0, 20)
         self.household_size.setSpecialValueText("Automatic")
         self.household_size.setMaximumWidth(FIELD_WIDTH)
+        self.aca_tier = ComboBox()
+        for key, text in ACA_PLAN_TIERS.items():
+            self.aca_tier.addItem(text, key)
         hform.addRow("", self.brokerage)
         hform.addRow("", self.aca)
-        _add_row(hform, "Household size (for FPL)", self.household_size)
+        _add_row(hform, "ACA plan tier", self.aca_tier,
+                 "Metal tier of the marketplace plan. Cost-sharing reductions (the\n"
+                 "250% FPL line) only come with a Silver plan.")
+        _add_row(hform, "Household size (for FPL)", self.household_size,
+                 "People in the tax household, dependents included, for the\n"
+                 "poverty line the ACA lines and premium tax credit use.")
         outer.addWidget(hh)
+
+        edu = QGroupBox("Education credits")
+        eform = compact_form(QFormLayout(edu))
+        self.aotc_students = SpinBox()
+        self.aotc_students.setRange(0, 10)
+        self.aotc_students.setMaximumWidth(80)
+        self.aotc_expenses = money_box()
+        self.aotc_expenses.setSingleStep(500)
+        self.llc_expenses = money_box()
+        self.education_last = SpinBox()
+        self.education_last.setRange(2019, 2100)
+        self.education_last.setSpecialValueText("This year only")
+        self.education_last.setMaximumWidth(FIELD_WIDTH)
+        _add_row(eform, "College students (AOTC)", self.aotc_students,
+                 "Students in their first four years of college that you claim\n"
+                 "the American Opportunity credit for: up to $2,500 each, 40% of\n"
+                 "it refundable. Phases out from MAGI $80,000 ($160,000 joint).")
+        _add_row(eform, "Expenses per student", self.aotc_expenses,
+                 "Qualified tuition, fees and books for each student, after\n"
+                 "grants and scholarships. $4,000 or more gets the full credit.")
+        _add_row(eform, "Lifetime Learning expenses", self.llc_expenses,
+                 "Qualified expenses for other students (graduate school, or\n"
+                 "beyond four years): 20% of up to $10,000 a return, not refundable.")
+        _add_row(eform, "Claimed through", self.education_last,
+                 "Last year the forward plan claims these credits.")
+        outer.addWidget(edu)
         outer.addStretch(1)
 
         self.plan_name.textChanged.connect(self._emit)
@@ -240,7 +294,12 @@ class ProfileForm(QWidget):
         self.inflation.valueChanged.connect(self._emit)
         self.brokerage.toggled.connect(self._emit)
         self.aca.toggled.connect(self._emit)
+        self.aca_tier.currentIndexChanged.connect(self._emit)
         self.household_size.valueChanged.connect(self._emit)
+        self.aotc_students.valueChanged.connect(self._emit)
+        self.aotc_expenses.valueChanged.connect(self._emit)
+        self.llc_expenses.valueChanged.connect(self._emit)
+        self.education_last.valueChanged.connect(self._emit)
 
     def _emit(self, *_args) -> None:
         if not self._loading:
@@ -249,6 +308,13 @@ class ProfileForm(QWidget):
     def _year_changed(self, year: int) -> None:
         for box in self.person_boxes:
             box.set_tax_year(year)
+        # The lowest value of "Claimed through" reads "This year only".
+        last = self.education_last
+        keep = last.value() if last.value() > last.minimum() else None
+        last.blockSignals(True)
+        last.setMinimum(year - 1)
+        last.setValue(keep if keep is not None and keep >= year else year - 1)
+        last.blockSignals(False)
         self._emit()
 
     def _filing_changed(self, *_args) -> None:
@@ -272,7 +338,14 @@ class ProfileForm(QWidget):
                 box.setValue(getattr(profile.household, key))
             self.brokerage.setChecked(profile.household.has_taxable_brokerage)
             self.aca.setChecked(profile.household.aca_marketplace)
-            self.household_size.setValue(profile.household.household_size or 0)
+            h = profile.household
+            self.household_size.setValue(h.household_size or 0)
+            self.aca_tier.setCurrentIndex(max(0, self.aca_tier.findData(h.aca_plan_tier)))
+            self.aotc_students.setValue(h.aotc_students)
+            self.aotc_expenses.setValue(h.aotc_expenses_per_student)
+            self.llc_expenses.setValue(h.llc_expenses)
+            self.education_last.setMinimum(profile.year - 1)
+            self.education_last.setValue(h.education_last_year or profile.year - 1)
             self.person_boxes[1].setVisible(profile.filing_status in ("mfj", "mfs"))
         finally:
             self._loading = False
@@ -286,6 +359,12 @@ class ProfileForm(QWidget):
             has_taxable_brokerage=self.brokerage.isChecked(),
             aca_marketplace=self.aca.isChecked(),
             household_size=self.household_size.value() or None,
+            aca_plan_tier=self.aca_tier.currentData(),
+            aotc_students=self.aotc_students.value(),
+            aotc_expenses_per_student=self.aotc_expenses.value(),
+            llc_expenses=self.llc_expenses.value(),
+            education_last_year=(None if self.education_last.value() <= self.education_last.minimum()
+                                 else self.education_last.value()),
         )
         return Profile(
             name=self.plan_name.text() or "My plan",

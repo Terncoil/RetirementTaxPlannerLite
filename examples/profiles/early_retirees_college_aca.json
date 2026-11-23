@@ -1,0 +1,22 @@
+{
+  "name": "Early retirees with two in college, on the ACA",
+  "year": 2026,
+  "filing_status": "mfj",
+  "state": null,
+  "people": [
+    {"name": "Alex", "birth_year": 1971, "aca_benchmark_premium": 1100, "aca_plan_premium": 800},
+    {"name": "Sam", "birth_year": 1971, "aca_benchmark_premium": 1100, "aca_plan_premium": 800}
+  ],
+  "household": {
+    "taxable_interest": 18000,
+    "qualified_dividends": 9500,
+    "long_term_capital_gains": 35000,
+    "has_taxable_brokerage": true,
+    "aca_marketplace": true,
+    "aca_plan_tier": "bronze",
+    "household_size": 4,
+    "aotc_students": 2,
+    "aotc_expenses_per_student": 4000,
+    "education_last_year": 2028
+  }
+}

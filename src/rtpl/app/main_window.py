@@ -425,10 +425,25 @@ class MainWindow(QMainWindow):
             niit="NIIT",
             state="State tax",
             state_cg="State CG & QD tax",
+            edu="Education credit phase-out",
+            ptc="ACA premium tax credit phase-out",
+            nonref="Nonrefundable credit absorbing tax",
         )
         names.update(ANNOTATION_LABELS)
+        tips = {
+            "edu": "Education credits lost as MAGI rises through their phase-out\n"
+                   "(American Opportunity and Lifetime Learning).",
+            "ptc": "ACA premium subsidy lost on each extra dollar below the 400%\n"
+                   "cliff. A premium rather than a tax, but it costs the same.\n"
+                   "Needs a benchmark premium in the profile. The cliff itself is\n"
+                   "the ACA line, labelled with the subsidy lost there.",
+            "nonref": "Drawn below 0%: tax that an unused nonrefundable credit\n"
+                      "cancels, so the total stays at 0% until the credit is used up.",
+        }
         for key in [*LAYERS, *ANNOTATIONS]:
             cb = QCheckBox(names[key])
+            if key in tips:
+                cb.setToolTip(tips[key])
             cb.clicked.connect(lambda checked, k=key: self._user_toggled(k, checked))
             self.checks[key] = cb
             grid.addWidget(cb)
@@ -670,7 +685,8 @@ class MainWindow(QMainWindow):
         b = self.series.baseline
         self.statusBar().showMessage(
             f"Baseline: AGI ${b.agi:,.0f}, taxable income ${b.taxable_income:,.0f}, "
-            f"federal tax ${b.federal_tax:,.0f}, state tax ${b.state_tax:,.0f}"
+            f"federal tax {'-' if b.federal_tax < 0 else ''}${abs(b.federal_tax):,.0f}, "
+            f"state tax ${b.state_tax:,.0f}"
         )
 
     def redraw(self) -> None:
@@ -954,7 +970,7 @@ class MainWindow(QMainWindow):
         sections.append(Section(f"Baseline tax for {profile.year}", [
             ("AGI", f"${b.agi:,.0f}"),
             ("Taxable income", f"${b.taxable_income:,.0f}"),
-            ("Federal tax", f"${b.federal_tax:,.0f}"),
+            ("Federal tax", f"{'-' if b.federal_tax < 0 else ''}${abs(b.federal_tax):,.0f}"),
             ("State tax", f"${b.state_tax:,.0f}"),
         ]))
         vis = self.visibility()
