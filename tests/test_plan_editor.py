@@ -1,5 +1,6 @@
 """The Plan items tab: list, forms, add/duplicate/delete, switching items off."""
 
+import json
 import os
 from pathlib import Path
 
@@ -190,7 +191,7 @@ def test_save_plan_writes_edits(window, tmp_path):
     plan = window.plan_view.plan
     plan.assumptions.spending = 95000
     window.plan_path = tmp_path / "edited.plan.json"
-    assert window.save_profile()  # Save saves the open plan
+    assert window.save()  # Save saves the open plan
     assert Plan.load(window.plan_path).assumptions.spending == 95000
     assert not window.isWindowModified()
     assert window.windowTitle().startswith("edited.plan.json")
@@ -547,3 +548,65 @@ def test_add_an_hsa_contribution(window):
     assert rule.mode == "fixed" and rule.amount == 3_000
     form.kind.setCurrentIndex(form.kind.findData("withdrawal"))
     assert form.form.labelForField(form.account).text() == "From account"
+
+
+def test_file_menu_has_one_open_and_save(window):
+    menu = window.menuBar().actions()[0].menu()
+    names = [a.text() for a in menu.actions() if not a.isSeparator()]
+    assert names == ["&New", "&Open…", "&Save", "Save &As…", "Save &Profile As…",
+                     "New P&lan from Profile", "&Export Chart…", "Export &Year Table…",
+                     "Export &Report…", "E&xit"]
+
+
+def test_new_plan_from_profile_asks_about_unsaved_changes(window, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    plan = window.plan_view.plan
+    asked = []
+
+    def answer(button):
+        def warning(*_a, **_k):
+            asked.append(True)
+            return button
+        return warning
+
+    monkeypatch.setattr(QMessageBox, "warning", answer(QMessageBox.StandardButton.Cancel))
+    window.new_plan()  # nothing unsaved: no question
+    assert not asked and window.plan_view.plan is not plan
+    assert window.isWindowModified()  # the new plan is not on disk yet
+    new = window.plan_view.plan
+    window.new_plan()  # Cancel keeps the open plan
+    assert asked and window.plan_view.plan is new
+    monkeypatch.setattr(QMessageBox, "warning", answer(QMessageBox.StandardButton.Discard))
+    window.new_plan()
+    assert window.plan_view.plan is not new
+
+
+def test_save_as_saves_the_plan_under_the_new_name(window, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    window.plan_path = tmp_path / "old.json"
+    target = tmp_path / "new.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    assert window.save_as()
+    assert target.exists() and not window.plan_path.with_name("old.json").exists()
+    assert window.plan_path == target and "profile" in json.loads(target.read_text(encoding="utf-8"))
+
+
+def test_save_profile_as_with_a_plan_open(window, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+
+    from rtpl.model.profile import Profile
+
+    window.plan_path = tmp_path / "plan.json"
+    window.setWindowModified(True)
+    target = tmp_path / "profile.json"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(target), ""))
+    assert window.save_profile_as()
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert "profile" not in data and Profile.from_dict(data)
+    # The plan is still the open file, with its changes still unsaved.
+    assert window.plan_view.plan is not None and window.isWindowModified()
+    assert not window.plan_path.exists()
+    window.open_file(target)  # opens as a profile, with no plan
+    assert window.plan_view.plan is None and window.current_path == target

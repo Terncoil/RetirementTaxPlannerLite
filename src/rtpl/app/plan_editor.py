@@ -1389,6 +1389,10 @@ class PlanEditor(QWidget):
         self.hint = QLabel("Select an item to change it. Untick an account, income or strategy to see the plan "
                            "without it.")
         self.hint.setWordWrap(True)
+        # Near the top, a couple of lines down: the stack is as tall as the
+        # tallest form, so a centred hint can end up below a short screen.
+        self.hint.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self.hint.setContentsMargins(0, 2 * self.hint.fontMetrics().lineSpacing(), 0, 0)
         self.stack.addWidget(self.hint)
         for form in self.forms.values():
             self.stack.addWidget(form)

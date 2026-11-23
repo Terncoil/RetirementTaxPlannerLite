@@ -86,7 +86,7 @@ change to `main`.
 
 ## Forward-looking plans
 
-In the app, use **File > Open Plan** (try
+In the app, use **File > Open** (try
 `examples/plans/couple_conversions_inherited.json`) or **File > New Plan
 from Profile**, then the **Forward plan** tab. The left panel's **Plan
 items** tab lists the accounts, income, Social Security, strategies (Roth
@@ -94,7 +94,11 @@ conversions, withdrawals, qualified charitable distributions and HSA contributio
 years it covers, under a **Plan name** for this version of the plan ("Roth
 conversions until Social Security"). Select one to change it in the form below the list, add
 or delete items, or untick one to see the plan without it; the graph and
-totals update as you type. **File > Save** saves the plan. From the
+totals update as you type. One profile, and at most one plan, is open at
+a time. **File > Open** opens either kind of file. **File > Save** and
+**Save As** save the plan when one is open (a plan file holds its profile
+too), otherwise the profile; **Save Profile As** saves just the profile.
+New, Open, New Plan from Profile and Exit ask first about unsaved changes. From the
 command line:
 
 ```bash

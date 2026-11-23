@@ -584,18 +584,23 @@ class MainWindow(QMainWindow):
 
     def _build_menus(self) -> None:
         m = self.menuBar().addMenu("&File")
+        m.setToolTipsVisible(True)
         for text, key, slot in (
             ("&New", QKeySequence.StandardKey.New, self.new_profile),
-            ("&Open…", QKeySequence.StandardKey.Open, self.open_profile),
-            ("&Save", QKeySequence.StandardKey.Save, self.save_profile),
-            ("Save &As…", QKeySequence.StandardKey.SaveAs, self.save_profile_as),
+            ("&Open…", QKeySequence.StandardKey.Open, self.open_document),
+            ("&Save", QKeySequence.StandardKey.Save, self.save),
+            ("Save &As…", QKeySequence.StandardKey.SaveAs, self.save_as),
         ):
             act = QAction(text, self, shortcut=key, triggered=slot)
             m.addAction(act)
+        save_profile = QAction("Save &Profile As…", self, shortcut="Ctrl+Alt+S", triggered=self.save_profile_as)
+        save_profile.setToolTip("Save only the profile (no plan items), even while a plan is open")
+        m.addAction(save_profile)
         m.addSeparator()
-        m.addAction(QAction("New Plan from &Profile", self, triggered=self.new_plan))
-        m.addAction(QAction("Open P&lan…", self, shortcut="Ctrl+Shift+O", triggered=self.open_plan))
-        m.addAction(QAction("Save Pla&n As…", self, shortcut="Ctrl+Alt+S", triggered=self.save_plan_as))
+        new_plan = QAction("New P&lan from Profile", self, triggered=self.new_plan)
+        new_plan.setToolTip("Start a forward plan from the profile. It replaces the open plan,\n"
+                            "if there is one; you are asked first about unsaved changes")
+        m.addAction(new_plan)
         m.addSeparator()
         m.addAction(QAction("&Export Chart…", self, shortcut="Ctrl+E", triggered=self.export_chart))
         self.export_table_action = QAction("Export &Year Table…", self, shortcut="Ctrl+Shift+E",
@@ -777,7 +782,7 @@ class MainWindow(QMainWindow):
             | QMessageBox.StandardButton.Cancel,
         )
         if answer == QMessageBox.StandardButton.Save:
-            return self.save_profile()
+            return self.save()
         return answer == QMessageBox.StandardButton.Discard
 
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt name)
@@ -792,10 +797,11 @@ class MainWindow(QMainWindow):
             self._set_plan(None)
             self._load_profile(self._starter_profile(), None)
 
-    def open_profile(self) -> None:
+    def open_document(self) -> None:
+        """File > Open: a profile or a plan, whichever the file holds."""
         if not self.maybe_save():
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Open Profile or Plan", "", "Profiles and plans (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Open", "", "Profiles and plans (*.json)")
         if path:
             self.open_file(Path(path))
 
@@ -813,20 +819,55 @@ class MainWindow(QMainWindow):
         self._set_plan(None)
         self._load_profile(profile, path)
 
-    def save_profile(self) -> bool:
-        """Save what is open: the plan when one is open, otherwise the profile."""
+    def save(self) -> bool:
+        """File > Save: the plan when one is open, otherwise the profile."""
         if self.plan_view.plan is not None:
-            return self.save_plan()
+            return self._save_plan()
         if self.current_path is None:
-            return self.save_profile_as()
-        try:
-            self.form.profile().save(self.current_path)
-        except OSError as exc:
-            QMessageBox.warning(self, "Save Profile", f"Could not save the profile:\n{exc}")
+            return self.save_as()
+        if not self._write_profile(self.current_path):
             return False
         self.setWindowModified(False)
         self._update_title()
-        self.statusBar().showMessage(f"Saved {self.current_path}", 4000)
+        return True
+
+    def save_as(self) -> bool:
+        """File > Save As: what is open (the plan, or else the profile) under a new name."""
+        if self.plan_view.plan is not None:
+            start = str(self.plan_path) if self.plan_path else self._suggested_plan_path(".json")
+            path, _ = QFileDialog.getSaveFileName(self, "Save Plan As", start, "Plans (*.json)")
+            if not path:
+                return False
+            self.plan_path = Path(path)
+            return self._save_plan()
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Profile As", self._suggested_path(".json"), "Profiles (*.json)")
+        if not path:
+            return False
+        self.current_path = Path(path)
+        return self.save()
+
+    def save_profile_as(self) -> bool:
+        """File > Save Profile As: only the profile, even while a plan is open.
+
+        With no plan open this is the same as Save As. With a plan open the
+        plan stays the open file, so its own unsaved changes stay unsaved."""
+        if self.plan_view.plan is None:
+            return self.save_as()
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Profile As", self._suggested_path(".json"), "Profiles (*.json)")
+        if not path:
+            return False
+        return self._write_profile(Path(path))
+
+    def _write_profile(self, path: Path) -> bool:
+        try:
+            self.form.profile().save(path)
+        except OSError as exc:
+            QMessageBox.warning(self, "Save Profile", f"Could not save the profile:\n{exc}")
+            return False
+        self.current_path = path
+        self.statusBar().showMessage(f"Saved {path}", 4000)
         return True
 
     def _suggested_path(self, suffix: str) -> str:
@@ -834,59 +875,38 @@ class MainWindow(QMainWindow):
         return str(folder / (safe_file_stem(self.form.plan_name.text()) + suffix))
 
     def _suggested_plan_path(self, suffix: str) -> str:
-        """Baseline name plus the plan's own name, e.g. "Smith - Roth until SS.plan.json"."""
+        """Baseline name plus the plan's own name, e.g. "Smith - Roth until SS.json"."""
         plan = self.plan_view.plan
         assert plan is not None
         plan.profile = self.form.profile()
         folder = (self.plan_path or self.current_path or Path.home() / "x").parent
         return str(folder / (safe_file_stem(plan.title, "plan") + suffix))
 
-    def save_profile_as(self) -> bool:
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Profile", self._suggested_path(".json"), "Profiles (*.json)"
-        )
-        if not path:
-            return False
-        self.current_path = Path(path)
-        return self.save_profile()
-
     # -- plans -----------------------------------------------------------
     def load_plan(self, plan: Plan, path: Path | None) -> None:
         """Show a plan; its profile becomes the profile on the left."""
         self.plan_path = path
         self._set_plan(plan)
-        self._load_profile(plan.profile, None)
+        self._load_profile(plan.profile, self.current_path if path is None else None)
         self.pages.setCurrentWidget(self.plan_view)
         self._sync_input_tabs()
         self.recompute()
 
     def new_plan(self) -> None:
+        """File > New Plan from Profile. Only one plan is open at a time, so
+        this asks first about unsaved changes, as File > New and Exit do."""
+        if not self.maybe_save():
+            return
         self.load_plan(Plan.from_profile(self.form.profile()), None)
+        # The new plan is not on disk yet: Exit or New asks before losing it.
+        self.setWindowModified(True)
         self.statusBar().showMessage(
             "New plan from the profile: wages, pensions and Social Security carry forward. "
             "Add accounts and strategies on the Plan items tab.", 8000)
 
-    def open_plan(self) -> None:
-        if not self.maybe_save():
-            return
-        path, _ = QFileDialog.getOpenFileName(self, "Open Plan", "", "Plans (*.json)")
-        if not path:
-            return
-        try:
-            data = json.loads(Path(path).read_text(encoding="utf-8"))
-            # A plain profile starts a new plan from it.
-            plan = Plan.from_dict(data) if "profile" in data else Plan.from_profile(Profile.from_dict(data))
-        except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
-            QMessageBox.warning(self, "Open Plan", f"Could not open the plan:\n{exc}")
-            return
-        self.load_plan(plan, Path(path) if "profile" in data else None)
-
-    def save_plan(self) -> bool:
-        if self.plan_view.plan is None:
-            QMessageBox.information(self, "Save Plan", "There is no plan to save yet.")
-            return False
+    def _save_plan(self) -> bool:
         if self.plan_path is None:
-            return self.save_plan_as()
+            return self.save_as()
         plan = self.plan_view.plan
         plan.profile = self.form.profile()
         try:
@@ -898,17 +918,6 @@ class MainWindow(QMainWindow):
         self._update_title()
         self.statusBar().showMessage(f"Saved {self.plan_path}", 4000)
         return True
-
-    def save_plan_as(self) -> bool:
-        if self.plan_view.plan is None:
-            QMessageBox.information(self, "Save Plan", "There is no plan to save yet.")
-            return False
-        start = str(self.plan_path) if self.plan_path else self._suggested_plan_path(".plan.json")
-        path, _ = QFileDialog.getSaveFileName(self, "Save Plan", start, "Plans (*.json)")
-        if not path:
-            return False
-        self.plan_path = Path(path)
-        return self.save_plan()
 
     def export_chart(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
