@@ -1,0 +1,57 @@
+# Michigan personal income tax, 2024.
+# hoh and mfs use the single values unless listed.
+#
+# Retirement deductions go by birth year, judged on a joint return by the
+# older spouse. Born before 1946 (Tier 1): pensions and IRA distributions up
+# to the limit below. Born 1946-1952 (Tier 2, all 67 or older by 2020):
+# $20,000 ($40,000 joint) against all income. Public Act 4 of 2023 phases in the
+# Tier 1 limit for later births: in 2024, those born 1946-1962 get 50% of it.
+# Born 1946-1952 take the larger of that and the $20,000 deduction.
+
+code = "MI"
+name = "Michigan"
+year = 2024
+sources = ["Michigan Treasury, Tax Year 2024 Guidance"]
+taxes_social_security = false
+notes = [
+  "Rate 4.25%. Public pensions are treated like private ones (Tier 1 subtracts public pensions in full). The senior interest, dividend and capital gains deduction (born before 1946) and the age-67 Michigan standard deduction for those born 1953 and later (reduced by taxable Social Security and the exemption) are not modelled. City income taxes not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0425]]
+mfj    = [[0, 0.0425]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[exemption]
+per_person = 5600
+
+# Tier 1: born before 1946.
+[[retirement_exclusions]]
+born_before = 1946
+birth_year_of = "older_spouse"
+group = "retirement"
+amount = 64040
+per_return = { single = 64040, mfj = 128080 }
+
+# Public Act 4 phase-in: 50% of the Tier 1 limit.
+[[retirement_exclusions]]
+born_from = 1946
+born_before = 1963
+birth_year_of = "older_spouse"
+group = "retirement"
+amount = 32020
+per_return = { single = 32020, mfj = 64040 }
+
+# Tier 2: born 1946-1952 and 67 or older, $20,000 against all income.
+[[retirement_exclusions]]
+born_from = 1946
+born_before = 1953
+min_age = 67
+birth_year_of = "older_spouse"
+group = "retirement"
+applies_to = ["any"]
+amount = 20000
+per_return = { single = 20000, mfj = 40000 }

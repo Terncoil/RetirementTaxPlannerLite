@@ -1,0 +1,26 @@
+# Missouri personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MO"
+name = "Missouri"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+capital_gains_exclusion = 1
+notes = [
+  "Capital gains exempt from 2025.",
+  "Public pension and private pension exemptions not modelled.",
+]
+
+[brackets]
+single = [[0, 0], [1313, 0.02], [2626, 0.025], [3939, 0.03], [5252, 0.035], [6565, 0.04], [7878, 0.045], [9191, 0.047]]
+mfj    = [[0, 0], [1313, 0.02], [2626, 0.025], [3939, 0.03], [5252, 0.035], [6565, 0.04], [7878, 0.045], [9191, 0.047]]
+
+[standard_deduction]
+single = 15000
+mfj    = 30000

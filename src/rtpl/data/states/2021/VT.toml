@@ -1,0 +1,31 @@
+# Vermont personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "VT"
+name = "Vermont"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exemption limits approximated; capital gains exclusion not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0335], [40350, 0.066], [97800, 0.076], [204000, 0.0875]]
+mfj    = [[0, 0.0335], [67450, 0.066], [163000, 0.076], [248350, 0.0875]]
+
+[standard_deduction]
+single = 6250
+mfj    = 12500
+
+[exemption]
+per_person = 4350
+
+[social_security]
+exempt_if_agi_at_most = { single = 45000, mfj = 60000 }
+phaseout_width = { single = 10000, mfj = 10000 }

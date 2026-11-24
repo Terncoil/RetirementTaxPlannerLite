@@ -1,0 +1,31 @@
+# Iowa personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "IA"
+name = "Iowa"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Retirement income exempt at 55+ (from 2023). Starts from federal taxable income, so the federal standard deduction applies.",
+]
+
+[brackets]
+single = [[0, 0.038]]
+mfj    = [[0, 0.038]]
+
+[standard_deduction]
+single = 15000
+mfj    = 30000
+
+[exemption]
+credit_per_person = 40
+
+[[retirement_exclusions]]
+amount = "unlimited"
+min_age = 55

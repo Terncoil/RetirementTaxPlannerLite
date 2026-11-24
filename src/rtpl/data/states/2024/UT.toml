@@ -1,0 +1,44 @@
+# Utah personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "UT"
+name = "Utah"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+  "2025 TC-40 instructions (retirement credit)",
+]
+taxes_social_security = true
+notes = [
+  "Taxpayer credit: 6% of the federal standard (or itemized) deduction, less 1.3% of Utah income over the base; the 6% of dependents' exemptions is not modelled. Phase-out base for 2024 approximate where not published in the sources.",
+  "Social Security credit (phase-out from $45,000 single / $75,000 joint) and retirement credit (born before 1953) both phase out at 2.5 cents per dollar of income over their limits; only the larger counts.",
+]
+
+[brackets]
+single = [[0, 0.0455]]
+mfj    = [[0, 0.0455]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[[credits]]
+name = "Taxpayer credit"
+federal_deduction_rate = 0.06
+phaseout = { start = { single = 17000, mfj = 34000, hoh = 25500 }, rate = 0.013, income = "state_income" }
+
+[[credits]]
+name = "Social Security benefits credit"
+social_security_rate = 0.0455
+group = "retirement"
+phaseout = { start = { single = 45000, mfj = 75000, hoh = 75000, mfs = 37500 }, rate = 0.025, income = "magi" }
+
+[[credits]]
+name = "Retirement credit"
+per_person = 450
+born_before = 1953
+group = "retirement"
+phaseout = { start = { single = 25000, mfj = 32000, hoh = 32000, mfs = 16000 }, rate = 0.025, income = "magi" }

@@ -1,0 +1,24 @@
+# Minnesota personal income tax, 2020.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MN"
+name = "Minnesota"
+year = 2020
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2020 (PDF)",
+]
+taxes_social_security = true
+notes = [
+  "Social Security taxed as federally; the small Social Security subtraction (before 2023) is not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0535], [26960, 0.068], [88550, 0.0785], [164400, 0.0985]]
+mfj    = [[0, 0.0535], [39410, 0.068], [156570, 0.0785], [273470, 0.0985]]
+
+[standard_deduction]
+single = 12400
+mfj    = 24800

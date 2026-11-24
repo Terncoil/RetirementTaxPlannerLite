@@ -1,0 +1,31 @@
+# West Virginia personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "WV"
+name = "West Virginia"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt with AGI up to $50,000 single / $100,000 joint; above, 65% exempt (fully exempt from 2026); senior income modification not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0222], [10000, 0.0296], [25000, 0.0333], [40000, 0.0444], [60000, 0.0482]]
+mfj    = [[0, 0.0222], [10000, 0.0296], [25000, 0.0333], [40000, 0.0444], [60000, 0.0482]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[exemption]
+per_person = 2000
+
+[social_security]
+exempt_if_agi_at_most = { single = 50000, mfj = 100000 }
+exempt_fraction_above = 0.65

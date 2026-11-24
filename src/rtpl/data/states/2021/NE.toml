@@ -1,0 +1,31 @@
+# Nebraska personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NE"
+name = "Nebraska"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt with AGI up to about $44,460 single / $59,100 joint (2020 limits); above, 5% exempt (fully exempt from 2024).",
+]
+
+[brackets]
+single = [[0, 0.0246], [3340, 0.0351], [19990, 0.0501], [32210, 0.0684]]
+mfj    = [[0, 0.0246], [6660, 0.0351], [39990, 0.0501], [64430, 0.0684]]
+
+[standard_deduction]
+single = 7100
+mfj    = 14200
+
+[exemption]
+credit_per_person = 142
+
+[social_security]
+exempt_if_agi_at_most = { single = 44460, mfj = 59100 }
+exempt_fraction_above = 0.05

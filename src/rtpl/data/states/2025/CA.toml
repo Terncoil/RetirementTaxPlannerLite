@@ -1,0 +1,29 @@
+# California personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CA"
+name = "California"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Top 13.3% includes the 1% Mental Health Services Tax over $1M.",
+  "Senior exemption credit and renter's credit not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [10756, 0.02], [25499, 0.04], [40245, 0.06], [55866, 0.08], [70606, 0.093], [360659, 0.103], [432787, 0.113], [721314, 0.123], [1000000, 0.133]]
+mfj    = [[0, 0.01], [21512, 0.02], [50998, 0.04], [80490, 0.06], [111732, 0.08], [141732, 0.093], [721318, 0.103], [865574, 0.113], [1000000, 0.123], [1442628, 0.133]]
+
+[standard_deduction]
+single = 5540
+mfj    = 11080
+
+[exemption]
+credit_per_person = 149

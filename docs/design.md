@@ -45,7 +45,7 @@ src/rtpl/
   cli.py                  headless marginal chart export (rtpl-chart)
   plan_cli.py             headless plan export: graphs and CSV (rtpl-plan)
   data/federal/*.toml     per-year federal law + projection rules
-  data/states/*.toml      per-state law
+  data/states/YYYY/*.toml per-state law by tax year
   data/rmd/tables.toml    IRS life expectancy tables
   data/themes/default.toml
 ```
@@ -89,11 +89,12 @@ phase-outs, fixed in statute). A `[policy]` table holds switches:
 * `aca_enhanced_subsidies` (true for 2025; false for 2026, which brings
   back the 400% FPL cliff)
 
-**State files** (`data/states/XX.toml`, all 50 states plus DC for 2026)
-hold brackets, standard deduction, personal exemptions (as deductions or
+**State files** (`data/states/<year>/XX.toml`, all 50 states plus DC for
+2020 to 2026) hold brackets, standard deduction, personal exemptions (as deductions or
 credits), a Social Security rule (exempt, taxed, exempt from an age, or
 exempt below an AGI limit with an optional phase-out), per-person
-pension/IRA exclusions with minimum ages, an age-based deduction, capital
+pension/IRA exclusions with minimum ages and qualifying birth years, an
+age-based deduction, capital
 gains exclusions or rate caps, a gains-only tax (Washington), and
 nonrefundable `[[credits]]` (a flat amount, an amount per person, a share
 of the federal deduction, or a share of the Social Security the state
@@ -132,8 +133,32 @@ forward plan does not model yet for plans that start in those years:
 * 2021–2024: the IRS waivers of yearly inherited IRA RMDs under the
   10-year rule (owner had started RMDs, death in 2020 or later).
 
-State files hold one year (2026) and the app uses it for every year, so
-historical state tax needs a year-aware state loader first.
+**State law by year.** Each state's files sit in a folder per tax year.
+A year without a file uses the newest earlier one (so a state only needs
+a file in the years its law changed, and a future year keeps the newest
+law), or the earliest one for a year before them all; the marginal graph
+then says in a footnote which year's law it used. State amounts are not
+projected with inflation. A `states/XX.toml` outside a year folder in the
+user's `taxlaw` folder replaces that state's shipped files for every year.
+
+A retirement exclusion can be limited to birth years (`born_from`,
+inclusive, and `born_before`), judged by the person or, with
+`birth_year_of = "older_spouse"`, by the older spouse; `applies_to =
+["any"]` makes it a deduction against all income; and of the exclusions
+that share a `group` the return uses the one that excludes the most.
+Michigan uses all three for its tiers and the 2023-2025 phase-in.
+
+The 2020-2025 files take brackets, standard deductions and exemptions
+from the Tax Foundation's table for each year (as of January 1), with
+rate cuts passed later that applied to the whole year (Arkansas, Georgia,
+Kansas, North Dakota, Ohio, South Carolina, Utah, West Virginia and
+others) put in their place. Retiree rules follow each state's history
+where it changed: Social Security exemptions (Colorado, Kansas,
+Minnesota, Missouri, Nebraska, New Mexico, North Dakota, Rhode Island,
+Vermont, West Virginia, Utah's credit), retirement exclusions
+(Connecticut, Iowa, Michigan, New Jersey, Rhode Island, Wisconsin) and
+Washington's capital gains tax from 2022. Each file's `notes` say what is
+approximate.
 
 **Projection.** Years without a file are built from the newest enacted
 year by `federal/projection.toml`: indexed amounts (brackets, standard
@@ -348,7 +373,7 @@ final balances.
 
 | Item | Fields |
 |---|---|
-| Account | id, type (traditional IRA, 401(k)/403(b), inherited IRA, Roth IRA, Roth 401(k), HSA, taxable brokerage, cash), owner, balance, optional return; taxable: cost basis and yields (interest, qualified and non-qualified dividends, capital gain distributions); traditional: spouse is sole beneficiary; inherited: year inherited, original owner's birth year, whether they had started RMDs, who inherited it (spouse, minor child, disabled or chronically ill, not more than 10 years younger, other person, estate or trust) |
+| Account | id, type (traditional IRA, 401(k)/403(b), inherited IRA, Roth IRA, Roth 401(k), HSA, taxable brokerage, cash), owner, balance on Jan 1 of the plan's first year, optional return; taxable: cost basis and yields (interest, qualified and non-qualified dividends, capital gain distributions); traditional: spouse is sole beneficiary; inherited: year inherited, original owner's birth year, whether they had started RMDs, who inherited it (spouse, minor child, disabled or chronically ill, not more than 10 years younger, other person, estate or trust) |
 | Income stream | wages, pension, foreign pension, annuity, interest, qualified dividends, long-term gain, other ordinary, tax-exempt; owner, yearly amount in the first year paid, start and end (age, year, a death or the end of the plan; one year for a one-off), COLA (None, Inflation, Social Security COLA or Fixed %; "yearly increase" for interest, dividends and other income), survivor %, federal taxable % |
 | Social Security (per person) | benefit at full retirement age (today's dollars), claiming age (years and months), or the benefit already being paid; SSDI, with an optional early end age (a claiming age past FRA suspends SSDI's retirement benefit until then) |
 | Person (on the baseline) | birth year, life expectancy (default 95) |

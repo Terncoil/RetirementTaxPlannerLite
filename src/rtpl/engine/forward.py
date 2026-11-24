@@ -324,7 +324,7 @@ class PlanEngine:
         self.library = library
         self.tables = tables or default_tables()
         self.profile = plan.profile
-        self.state_law: StateLaw | None = library.state(plan.profile.state) if plan.profile.state else None
+        self._state_laws: dict[int, StateLaw | None] = {}
         # Inherited IRA deadlines; a successor beneficiary of a stretching
         # account gets a new 10-year deadline when the first one dies.
         self.deadlines: dict[str, int | None] = {a.id: a.deadline_year(plan.profile) for a in plan.accounts}
@@ -685,6 +685,13 @@ class PlanEngine:
             return (lambda r: r.magi_irmaa), float(arg)
         raise ValueError(f"Unknown fill target {target!r}")
 
+    def state_law(self, year: int) -> StateLaw | None:
+        """The plan's state tax law for ``year`` (None without a state)."""
+        if year not in self._state_laws:
+            code = self.plan.profile.state
+            self._state_laws[year] = self.library.state(code, year) if code else None
+        return self._state_laws[year]
+
     def solve_extra_ordinary(self, prof: Profile, law: FederalLaw, metric, limit: float,
                              lo: float, hi: float, tol: float = 1.0, *, extrapolate: bool = False) -> float:
         """Largest extra ordinary income in [lo, hi] with metric <= limit.
@@ -693,7 +700,7 @@ class PlanEngine:
         it instead goes below ``lo`` by the amount the metric is over, as if
         each further dollar removed lowered the metric by a dollar.
         """
-        f = lambda x: metric(compute_tax(prof, law, self.state_law, extra=x, source=IncomeSource.ORDINARY))  # noqa: E731
+        f = lambda x: metric(compute_tax(prof, law, self.state_law(prof.year), extra=x, source=IncomeSource.ORDINARY))  # noqa: E731
         at_lo = f(lo)
         if at_lo > limit:
             return lo - (at_lo - limit) if extrapolate else lo
@@ -923,7 +930,7 @@ class PlanEngine:
                 y_try = copy.deepcopy(y)
                 self._add_cover_income(y_try, sale_plan, by_id, living)
                 prof = self.build_profile(year, y_try, fs)
-                tax = compute_tax(prof, law, self.state_law)
+                tax = compute_tax(prof, law, self.state_law(prof.year))
                 net = inflow - (spending + tax.total_tax + surcharge + y.hsa_deduction + tax.aca_net_premium)
                 new_plan, short = self._cover_deficit(-net, accounts, bal, withdrawn, basis)
                 new_taxed = _taxed_cover(new_plan, by_id)
@@ -945,7 +952,7 @@ class PlanEngine:
                     cat = "inherited" if acct.kind == "inherited_ira" else "ira_withdrawal"
                     take_from(acct, amount, cat, f"{labels[acct_id]} withdrawal for spending")
             prof = self.build_profile(year, y, fs)
-            tax = compute_tax(prof, law, self.state_law)
+            tax = compute_tax(prof, law, self.state_law(prof.year))
             surplus = max(0.0, net) if net >= 0 else 0.0
             if shortfall > 0:
                 notes.append(f"Short ${shortfall:,.0f}: spending and tax exceed income and the accounts in the "
@@ -991,7 +998,7 @@ class PlanEngine:
                          for k, v in withdrawn.items()}
             other_out.update({k: v + self._taken_before.get(k, 0.0) for k, v in other_out.items()
                               if k in self._taken_before})
-            marginal = (compute_tax(prof, law, self.state_law, extra=1000.0).total_tax - tax.total_tax) / 1000.0
+            marginal = (compute_tax(prof, law, self.state_law(prof.year), extra=1000.0).total_tax - tax.total_tax) / 1000.0
             yr = YearResult(
                 year=year,
                 ages={i: profile.people[i].age_in(year) for i in living},

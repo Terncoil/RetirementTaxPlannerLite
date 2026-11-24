@@ -1,0 +1,28 @@
+# New Mexico personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NM"
+name = "New Mexico"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt below $100K single / $150K joint (a cliff).",
+  "65+ deduction and capital gains deduction not modelled.",
+]
+
+[brackets]
+single = [[0, 0.017], [5500, 0.032], [11000, 0.047], [16000, 0.049], [210000, 0.059]]
+mfj    = [[0, 0.017], [8000, 0.032], [16000, 0.047], [24000, 0.049], [315000, 0.059]]
+
+[standard_deduction]
+single = 14600
+mfj    = 29200
+
+[social_security]
+exempt_if_agi_at_most = { single = 100000, mfj = 150000 }

@@ -1,0 +1,27 @@
+# Maine personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "ME"
+name = "Maine"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Pension deduction (reduced by Social Security) not modelled.",
+]
+
+[brackets]
+single = [[0, 0.058], [26050, 0.0675], [61600, 0.0715]]
+mfj    = [[0, 0.058], [52100, 0.0675], [123250, 0.0715]]
+
+[standard_deduction]
+single = 14600
+mfj    = 29200
+
+[exemption]
+per_person = 5000

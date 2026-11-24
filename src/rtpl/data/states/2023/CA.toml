@@ -1,0 +1,29 @@
+# California personal income tax, 2023.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CA"
+name = "California"
+year = 2023
+sources = [
+  "Tax Foundation, 2023 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Top 13.3% includes the 1% Mental Health Services Tax over $1M.",
+  "Senior exemption credit and renter's credit not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [10099, 0.02], [23942, 0.04], [37788, 0.06], [52455, 0.08], [66295, 0.093], [338639, 0.103], [406364, 0.113], [677275, 0.123], [1000000, 0.133]]
+mfj    = [[0, 0.01], [20198, 0.02], [47884, 0.04], [75576, 0.06], [104910, 0.08], [132590, 0.093], [677278, 0.103], [812728, 0.113], [1000000, 0.123], [1354550, 0.133]]
+
+[standard_deduction]
+single = 5202
+mfj    = 10404
+
+[exemption]
+credit_per_person = 140

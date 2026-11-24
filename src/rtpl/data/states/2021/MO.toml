@@ -1,0 +1,32 @@
+# Missouri personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MO"
+name = "Missouri"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt with AGI up to $85,000 single / $100,000 joint; above, the exemption falls $1 per $1 (modelled as a cliff).",
+  "Capital gains taxed as ordinary income (exempt from 2025).",
+  "Public pension and private pension exemptions not modelled.",
+]
+chart_notes = [
+  "Social Security exemption cut-off drawn as a cliff (the law reduces it $1 per $1 over the limit).",
+]
+
+[brackets]
+single = [[0, 0], [107, 0.015], [1073, 0.02], [2146, 0.025], [3219, 0.03], [4292, 0.035], [5365, 0.04], [6438, 0.045], [7511, 0.05], [8584, 0.054]]
+mfj    = [[0, 0], [107, 0.015], [1073, 0.02], [2146, 0.025], [3219, 0.03], [4292, 0.035], [5365, 0.04], [6438, 0.045], [7511, 0.05], [8584, 0.054]]
+
+[standard_deduction]
+single = 12550
+mfj    = 25100
+
+[social_security]
+exempt_if_agi_at_most = { single = 85000, mfj = 100000 }

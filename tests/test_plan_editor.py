@@ -610,3 +610,17 @@ def test_save_profile_as_with_a_plan_open(window, tmp_path, monkeypatch):
     assert not window.plan_path.exists()
     window.open_file(target)  # opens as a profile, with no plan
     assert window.plan_view.plan is None and window.current_path == target
+
+
+def test_balance_label_follows_the_baseline_year(window):
+    ed = window.plan_editor
+    plan = window.plan_view.plan
+    pick(ed, plan.accounts[0])
+    form = ed.forms["accounts"]
+    label = form.form.labelForField(form.balance)
+    year = plan.start_year
+    assert label.text() == f"Balance on Jan 1, {year}"
+    window.form.year.setValue(year + 1)  # change the year on the Baseline tab
+    window._timer.timeout.emit()
+    assert plan.start_year == year + 1
+    assert label.text() == f"Balance on Jan 1, {year + 1}"

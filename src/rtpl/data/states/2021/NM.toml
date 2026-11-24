@@ -1,0 +1,25 @@
+# New Mexico personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NM"
+name = "New Mexico"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Social Security taxed as federally (exempt below $100K / $150K from 2022).",
+  "65+ deduction and capital gains deduction not modelled.",
+]
+
+[brackets]
+single = [[0, 0.017], [5500, 0.032], [11000, 0.047], [16000, 0.049], [210000, 0.059]]
+mfj    = [[0, 0.017], [8000, 0.032], [16000, 0.047], [24000, 0.049], [315000, 0.059]]
+
+[standard_deduction]
+single = 12550
+mfj    = 25100

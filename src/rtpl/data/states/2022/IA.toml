@@ -1,0 +1,31 @@
+# Iowa personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "IA"
+name = "Iowa"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+notes = [
+  "Pension/IRA exclusion $6,000 per person at 55+. Deduction for federal income tax paid not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0033], [1743, 0.0067], [3486, 0.0225], [6972, 0.0414], [15687, 0.0563], [26145, 0.0596], [34860, 0.0625], [52290, 0.0744], [78435, 0.0853]]
+mfj    = [[0, 0.0033], [1743, 0.0067], [3486, 0.0225], [6972, 0.0414], [15687, 0.0563], [26145, 0.0596], [34860, 0.0625], [52290, 0.0744], [78435, 0.0853]]
+
+[standard_deduction]
+single = 2210
+mfj    = 5450
+
+[exemption]
+credit_per_person = 40
+
+[[retirement_exclusions]]
+amount = 6000
+min_age = 55

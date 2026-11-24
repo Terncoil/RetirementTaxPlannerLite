@@ -1,0 +1,31 @@
+# Georgia personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "GA"
+name = "Georgia"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+notes = [
+  "Retirement exclusion $65,000 per person at 65+ (also covers interest, dividends and gains, modelled on pension/IRA only); $35,000 at 62-64 not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [750, 0.02], [2250, 0.03], [3750, 0.04], [5250, 0.05], [7000, 0.0575]]
+mfj    = [[0, 0.01], [1000, 0.02], [3000, 0.03], [5000, 0.04], [7000, 0.05], [10000, 0.0575]]
+
+[standard_deduction]
+single = 5400
+mfj    = 7100
+
+[exemption]
+per_person = 2700
+
+[[retirement_exclusions]]
+amount = 65000
+min_age = 65

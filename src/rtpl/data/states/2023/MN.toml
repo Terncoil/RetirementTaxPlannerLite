@@ -1,0 +1,31 @@
+# Minnesota personal income tax, 2023.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MN"
+name = "Minnesota"
+year = 2023
+sources = [
+  "Tax Foundation, 2023 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Social Security subtraction in full with AGI up to $78,000 single / $100,000 joint; its phase-out (10% for each $4,000 or part of $4,000 over the limit) is smoothed into a straight line.",
+]
+chart_notes = [
+  "Social Security subtraction phase-out smoothed (the law takes 10% off for each $4,000 of AGI over the limit, in steps).",
+]
+
+[brackets]
+single = [[0, 0.0535], [30070, 0.068], [98760, 0.0785], [183340, 0.0985]]
+mfj    = [[0, 0.0535], [43950, 0.068], [174610, 0.0785], [304970, 0.0985]]
+
+[standard_deduction]
+single = 13825
+mfj    = 27650
+
+[social_security]
+exempt_if_agi_at_most = { single = 78000, mfj = 100000 }
+phaseout_width = { single = 40000, mfj = 40000 }

@@ -74,20 +74,46 @@ def _retirement_exclusion(
     Extra ordinary income on the marginal graph counts as Person 1's IRA
     withdrawal. An exclusion with a ``per_return`` cap shares it between
     the people on the return; a phase-out scales each person's exclusion.
+    An exclusion that applies to ``any`` income is a deduction of its whole
+    amount. Of the exclusions in one ``group`` the return uses the one that
+    excludes the most.
     """
+    exclusions = state.retirement_exclusions
+    groups: dict[str, list] = {}
+    for ex in exclusions:
+        if ex.group is not None:
+            groups.setdefault(ex.group, []).append(ex)
+    if not groups:
+        return _excluded(profile, state, exclusions, extra_ira, incomes)
+    chosen = [ex for ex in exclusions if ex.group is None]
+    for members in groups.values():
+        chosen.append(max(
+            members,
+            key=lambda ex: _excluded(profile, state, (*chosen, ex), extra_ira, incomes),
+        ))
+    order = {id(ex): i for i, ex in enumerate(exclusions)}
+    chosen.sort(key=lambda ex: order[id(ex)])
+    return _excluded(profile, state, chosen, extra_ira, incomes)
+
+
+def _excluded(profile: Profile, state: StateLaw, exclusions, extra_ira: float, incomes: dict[str, float]) -> float:
     fs = status_key(profile.filing_status)
     total = 0.0
-    return_left = {id(ex): ex.per_return[fs] for ex in state.retirement_exclusions if ex.per_return}
+    return_left = {id(ex): ex.per_return[fs] for ex in exclusions if ex.per_return}
+    oldest = min(p.birth_year for p in profile.people)
     for i, person in enumerate(profile.people):
         remaining = {
             "pension": person.pension,
             "ira": person.ira_distributions + (extra_ira if i == 0 else 0.0),
         }
         age = person.age_in(profile.year)
-        for ex in state.retirement_exclusions:
-            if age < ex.min_age:
+        for ex in exclusions:
+            if not ex.qualifies(oldest if ex.birth_year_of == "older_spouse" else person.birth_year, age):
                 continue
-            eligible = sum(remaining[k] for k in ex.applies_to if k in remaining)
+            if "any" in ex.applies_to:
+                eligible = math.inf
+            else:
+                eligible = sum(remaining[k] for k in ex.applies_to if k in remaining)
             cap = return_left[id(ex)] if ex.per_return else ex.amount
             used = min(eligible, cap)
             if ex.per_return:

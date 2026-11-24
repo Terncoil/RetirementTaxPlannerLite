@@ -1,0 +1,23 @@
+# North Dakota personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "ND"
+name = "North Dakota"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.4
+notes = []
+
+[brackets]
+single = [[0, 0.011], [40125, 0.0204], [97150, 0.0227], [202650, 0.0264], [440600, 0.029]]
+mfj    = [[0, 0.011], [67050, 0.0204], [161950, 0.0227], [246700, 0.0264], [440600, 0.029]]
+
+[standard_deduction]
+single = 12550
+mfj    = 25100

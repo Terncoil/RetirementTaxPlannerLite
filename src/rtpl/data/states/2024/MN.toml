@@ -1,0 +1,31 @@
+# Minnesota personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MN"
+name = "Minnesota"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Social Security subtraction in full with AGI up to $82,190 single / $105,380 joint; its phase-out (10% for each $4,000 or part of $4,000 over the limit) is smoothed into a straight line.",
+]
+chart_notes = [
+  "Social Security subtraction phase-out smoothed (the law takes 10% off for each $4,000 of AGI over the limit, in steps).",
+]
+
+[brackets]
+single = [[0, 0.0535], [31690, 0.068], [104090, 0.0785], [193240, 0.0985]]
+mfj    = [[0, 0.0535], [46330, 0.068], [184040, 0.0785], [321450, 0.0985]]
+
+[standard_deduction]
+single = 14575
+mfj    = 29150
+
+[social_security]
+exempt_if_agi_at_most = { single = 82190, mfj = 105380 }
+phaseout_width = { single = 40000, mfj = 40000 }

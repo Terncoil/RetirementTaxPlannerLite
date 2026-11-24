@@ -1,0 +1,29 @@
+# New York personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NY"
+name = "New York"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+notes = [
+  "$20,000 pension/IRA exclusion at 59½+ (government pensions fully exempt, not modelled).",
+  "NYC and Yonkers income taxes and benefit recapture not modelled.",
+]
+
+[brackets]
+single = [[0, 0.04], [8500, 0.045], [11700, 0.0525], [13900, 0.059], [21400, 0.0597], [80650, 0.0633], [215400, 0.0685], [1077550, 0.0965], [5000000, 0.103], [25000000, 0.109]]
+mfj    = [[0, 0.04], [17150, 0.045], [23600, 0.0525], [27900, 0.059], [43000, 0.0597], [161550, 0.0633], [323200, 0.0685], [2155350, 0.0965], [5000000, 0.103], [25000000, 0.109]]
+
+[standard_deduction]
+single = 8000
+mfj    = 16050
+
+[[retirement_exclusions]]
+amount = 20000
+min_age = 60

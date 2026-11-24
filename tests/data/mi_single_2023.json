@@ -1,0 +1,44 @@
+{
+  "year": 2023,
+  "filing_status": "single",
+  "state": "MI",
+  "people": [
+    {
+      "name": "Person 1",
+      "birth_year": 1957,
+      "life_expectancy": 95,
+      "medicare_part_b": null,
+      "blind": false,
+      "social_security": 40000.0,
+      "wages": 0.0,
+      "pension": 0.0,
+      "ira_distributions": 0.0,
+      "aca_benchmark_premium": 0.0,
+      "aca_plan_premium": 0.0
+    }
+  ],
+  "household": {
+    "taxable_interest": 0.0,
+    "tax_exempt_interest": 0.0,
+    "qualified_dividends": 8600.0,
+    "nonqualified_dividends": 0.0,
+    "long_term_capital_gains": 0.0,
+    "short_term_capital_gains": 0.0,
+    "other_ordinary_income": 0.0,
+    "other_investment_income": 0.0,
+    "adjustments": 0.0,
+    "hsa_deduction": 0.0,
+    "itemized_deductions": 0.0,
+    "has_taxable_brokerage": false,
+    "aca_marketplace": false,
+    "aca_plan_tier": "silver",
+    "aotc_students": 0,
+    "aotc_expenses_per_student": 4000.0,
+    "llc_expenses": 0.0,
+    "education_last_year": null,
+    "household_size": null
+  },
+  "name": "20231201 ToCki36XqWg 05.06.537",
+  "inflation": 0.025,
+  "schema_version": 1
+}

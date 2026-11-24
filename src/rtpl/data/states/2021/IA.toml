@@ -1,0 +1,31 @@
+# Iowa personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "IA"
+name = "Iowa"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+notes = [
+  "Pension/IRA exclusion $6,000 per person at 55+. Deduction for federal income tax paid not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0033], [1676, 0.0067], [3352, 0.0225], [6704, 0.0414], [15084, 0.0563], [25140, 0.0596], [33520, 0.0625], [50280, 0.0744], [75420, 0.0853]]
+mfj    = [[0, 0.0033], [1676, 0.0067], [3352, 0.0225], [6704, 0.0414], [15084, 0.0563], [25140, 0.0596], [33520, 0.0625], [50280, 0.0744], [75420, 0.0853]]
+
+[standard_deduction]
+single = 2130
+mfj    = 5240
+
+[exemption]
+credit_per_person = 40
+
+[[retirement_exclusions]]
+amount = 6000
+min_age = 55

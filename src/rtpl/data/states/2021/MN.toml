@@ -1,0 +1,24 @@
+# Minnesota personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MN"
+name = "Minnesota"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Social Security taxed as federally; the small Social Security subtraction (before 2023) is not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0535], [27230, 0.068], [89440, 0.0785], [166040, 0.0985]]
+mfj    = [[0, 0.0535], [39810, 0.068], [158140, 0.0785], [276200, 0.0985]]
+
+[standard_deduction]
+single = 12525
+mfj    = 25050

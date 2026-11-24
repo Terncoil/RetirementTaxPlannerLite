@@ -1,0 +1,29 @@
+# Ohio personal income tax, 2023.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "OH"
+name = "Ohio"
+year = 2023
+sources = [
+  "Tax Foundation, 2023 State Income Tax Rates and Brackets",
+  "Ohio Rev. Code 5747.025 (personal exemption by income)",
+]
+taxes_social_security = false
+notes = [
+  "Exemption $2,400 per person with income to $40K, $2,150 to $80K, $1,900 above (steps, none over $500K). Retirement and senior credits and municipal income taxes not modelled.",
+]
+
+[brackets]
+single = [[0, 0], [26050, 0.0275], [100000, 0.035]]
+mfj    = [[0, 0], [26050, 0.0275], [100000, 0.035]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[exemption]
+per_person = 2400
+phaseout = { income = "state_income", tiers = [{ up_to = { single = 40000, mfj = 40000 }, keep = 1 }, { up_to = { single = 80000, mfj = 80000 }, keep = 0.895833 }, { up_to = { single = 500000, mfj = 500000 }, keep = 0.791667 }] }

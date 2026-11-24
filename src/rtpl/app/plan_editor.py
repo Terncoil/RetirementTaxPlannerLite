@@ -700,7 +700,10 @@ class AccountForm(ItemForm):
         for k, label in ACCOUNT_KINDS.items():
             self.kind.addItem(label, k)
         self.owner = self.row("Owner", ComboBox())
-        self.balance = self.row("Balance today", money_box())
+        self.balance = self.row("Balance on Jan 1", money_box(),
+                                "Enter the balance at the start of the plan's first year\n"
+                                "(last year's Dec 31 statement). The plan applies this year's\n"
+                                "withdrawals and a full year's return to it.")
         self.own_return = self.row("Return", QCheckBox("Own return (otherwise the plan's default)"))
         self.return_rate = self.row("Yearly return (nominal)", percent_box(-20, 30), NOMINAL_TIP)
         self.cash_note = self.note_row("Return")
@@ -720,10 +723,12 @@ class AccountForm(ItemForm):
                                     "The owner of this account in the plan,\nas the original owner's beneficiary")
         for k, label in BENEFICIARY_KINDS.items():
             self.beneficiary.addItem(label, k)
-        self.rmd_taken = self.row("This year's RMD", QCheckBox("Already taken (out of the balance above)"),
-                                  "For a plan started mid-year: the plan still counts the RMD as\n"
-                                  "this year's income, but doesn't take it from the balance again.\n"
-                                  "Applies only while this year is the plan's first year.")
+        self.rmd_taken = self.row("This year's RMD", QCheckBox("Already taken (not in the balance above)"),
+                                  "Check this if the balance above is after this year's RMD came\n"
+                                  "out of it, rather than the Jan 1 balance. The plan still counts\n"
+                                  "the RMD as this year's income, but doesn't take it from the\n"
+                                  "balance again. Applies only while this year is the plan's\n"
+                                  "first year.")
         self.deadline = self.note_row("Withdrawals")
         self.deadline.setWordWrap(True)
         self.deadline.setMinimumWidth(220)
@@ -738,6 +743,9 @@ class AccountForm(ItemForm):
         self.kind.setCurrentIndex(max(0, self.kind.findData(a.kind)))
         set_items(self.owner, owner_combo(self.plan, a.kind in JOINT_KINDS), a.owner)
         self.balance.setValue(a.balance)
+        balance_label = f"Balance on Jan 1, {self.plan.start_year}"
+        self.form.labelForField(self.balance).setText(balance_label)
+        self.balance.setAccessibleName(balance_label)
         self.own_return.setChecked(a.return_rate is not None)
         self.return_rate.setValue(100 * (a.return_rate if a.return_rate is not None else self.plan.assumptions.return_rate))
         self.basis.set_value(a.cost_basis, a.balance)
@@ -751,7 +759,7 @@ class AccountForm(ItemForm):
         self.started.setChecked(a.owner_started_rmds)
         self.beneficiary.setCurrentIndex(max(0, self.beneficiary.findData(a.beneficiary)))
         self.rmd_taken.setChecked(self.plan.rmd_taken_now(a))
-        self.rmd_taken.setText(f"Already taken for {self.plan.start_year} (out of the balance above)")
+        self.rmd_taken.setText(f"Already taken for {self.plan.start_year} (not in the balance above)")
 
     def store(self) -> None:
         a: Account = self.obj
@@ -1456,6 +1464,11 @@ class PlanEditor(QWidget):
                 self._describe(g.child(i))
         self.tree.blockSignals(False)
         self.tree.viewport().update()
+        # The open item's form shows the first year and names too (such as
+        # "Balance on Jan 1, <year>"), so fill it again.
+        form = self.stack.currentWidget()
+        if isinstance(form, ItemForm) and form.obj is not None and self.plan is not None:
+            form.load(self.plan, form.obj)
 
     def _describe(self, item: QTreeWidgetItem) -> None:
         key, obj = item.data(0, ROLE)

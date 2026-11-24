@@ -1,0 +1,18 @@
+# Washington, 2023: no wage income tax.
+
+code = "WA"
+name = "Washington"
+year = 2023
+sources = [
+  "WA Dept. of Revenue capital gains excise tax (RCW 82.87)",
+]
+has_income_tax = false
+taxes_social_security = false
+notes = [
+  "Only long-term capital gains are taxed; qualified dividends, interest and retirement income are not.",
+  "Real estate, retirement accounts and some business interests are exempt, but the profile's long-term gains are all treated as taxable.",
+]
+
+[capital_gains_tax]
+deduction = 262000
+brackets = [[0, 0.07]]

@@ -1,0 +1,30 @@
+# Wisconsin personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "WI"
+name = "Wisconsin"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+  "2025 Form 1 instructions (retirement income subtraction at 67+)",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.3
+notes = [
+  "Standard deduction phases out with income (not modelled); 30% of long-term gains excluded.",
+  "Retirement income taxed (the $24,000 subtraction at 67+ starts in 2025); the $5,000 income-limited subtraction is not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0354], [12760, 0.0465], [25520, 0.053], [280950, 0.0765]]
+mfj    = [[0, 0.0354], [17010, 0.0465], [34030, 0.053], [374600, 0.0765]]
+
+[standard_deduction]
+single = 11790
+mfj    = 21820
+
+[exemption]
+per_person = 700

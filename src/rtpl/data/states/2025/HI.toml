@@ -1,0 +1,33 @@
+# Hawaii personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "HI"
+name = "Hawaii"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+capital_gains_max_rate = 0.0725
+notes = [
+  "Employer pensions exempt; IRA withdrawals taxed.",
+  "Long-term gains capped at 7.25%.",
+]
+
+[brackets]
+single = [[0, 0.014], [9600, 0.032], [14400, 0.055], [19200, 0.064], [24000, 0.068], [36000, 0.072], [48000, 0.076], [125000, 0.079], [175000, 0.0825], [225000, 0.09], [275000, 0.1], [325000, 0.11]]
+mfj    = [[0, 0.014], [19200, 0.032], [28800, 0.055], [38400, 0.064], [48000, 0.068], [72000, 0.072], [96000, 0.076], [250000, 0.079], [350000, 0.0825], [450000, 0.09], [550000, 0.1], [650000, 0.11]]
+
+[standard_deduction]
+single = 4400
+mfj    = 8800
+
+[exemption]
+per_person = 1144
+
+[[retirement_exclusions]]
+amount = "unlimited"
+applies_to = ["pension"]

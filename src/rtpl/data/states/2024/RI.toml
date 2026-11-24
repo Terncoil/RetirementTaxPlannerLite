@@ -1,0 +1,40 @@
+# Rhode Island personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "RI"
+name = "Rhode Island"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+  "2025 RI-1040 instructions and worksheets (phase-out, Social Security and pension modification limits)",
+]
+taxes_social_security = true
+notes = [
+  "Social Security and pension modifications need full retirement age (modelled as 67) and AGI up to $104,200 single / $130,250 joint (cliffs); the pension modification ($20,000) excludes IRAs.",
+  "Standard deduction and exemptions fall 20% for each $7,250 of AGI over about $241,850 (approximate for 2022 and 2024).",
+]
+
+[brackets]
+single = [[0, 0.0375], [77450, 0.0475], [176050, 0.0599]]
+mfj    = [[0, 0.0375], [77450, 0.0475], [176050, 0.0599]]
+
+[standard_deduction]
+single = 10550
+mfj    = 21150
+phaseout = { start = { single = 241850, mfj = 241850 }, step = 7250, step_fraction = 0.2 }
+
+[exemption]
+per_person = 4950
+phaseout = { start = { single = 241850, mfj = 241850 }, step = 7250, step_fraction = 0.2 }
+
+[social_security]
+exempt_if_agi_at_most = { single = 104200, mfj = 130250 }
+
+[[retirement_exclusions]]
+amount = 20000
+min_age = 67
+applies_to = ["pension"]
+phaseout = { start = { single = 104200, mfj = 130250 } }

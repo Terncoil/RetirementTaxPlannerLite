@@ -218,6 +218,7 @@ class PanelHost(QObject):
         lay.addWidget(self.splitter)
         self.panels: list[SidePanel] = []
         self._open: dict[int, bool] = {}
+        self._placing = False  # moving a panel between the splitter and the workspace
         workspace.installEventFilter(self)
         QApplication.instance().installEventFilter(self)
         QApplication.instance().focusChanged.connect(self._focus_changed)
@@ -275,6 +276,21 @@ class PanelHost(QObject):
 
     # -- layout ------------------------------------------------------------
     def _place(self, panel: SidePanel) -> None:
+        # Reparenting hides the panel for a moment, and Qt moves focus out of
+        # it (to the graph). That must not count as the user leaving the
+        # panel, or a panel just switched to Auto hide would be marked closed
+        # while it stays on screen. Focus goes back to where it was.
+        focus = QApplication.focusWidget()
+        had_focus = focus is not None and panel.isAncestorOf(focus)
+        self._placing = True
+        try:
+            self._do_place(panel)
+        finally:
+            self._placing = False
+        if had_focus and panel.isVisible() and QApplication.focusWidget() is not focus:
+            focus.setFocus(Qt.FocusReason.OtherFocusReason)
+
+    def _do_place(self, panel: SidePanel) -> None:
         open_ = self._open[id(panel)]
         if self.is_pinned(panel):
             panel.setGraphicsEffect(None)
@@ -343,6 +359,8 @@ class PanelHost(QObject):
                 self.set_open(p, False)
 
     def _focus_changed(self, _old, new) -> None:
+        if self._placing:
+            return
         if new is None:
             return  # e.g. another app took focus; leave the panel open
         if new.window() is not self.workspace.window():

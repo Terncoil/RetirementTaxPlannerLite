@@ -1,0 +1,37 @@
+# Alabama personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "AL"
+name = "Alabama"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Defined-benefit pensions are exempt; $6,000 of other retirement income at 65+.",
+  "Standard deduction phases down with income; federal income tax deduction not modelled.",
+]
+
+[brackets]
+single = [[0, 0.02], [500, 0.04], [3000, 0.05]]
+mfj    = [[0, 0.02], [1000, 0.04], [6000, 0.05]]
+
+[standard_deduction]
+single = 3000
+mfj    = 8500
+
+[exemption]
+per_person = 1500
+
+[[retirement_exclusions]]
+amount = "unlimited"
+applies_to = ["pension"]
+
+[[retirement_exclusions]]
+amount = 6000
+min_age = 65
+applies_to = ["ira"]

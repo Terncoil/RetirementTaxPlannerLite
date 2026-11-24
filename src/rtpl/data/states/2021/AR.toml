@@ -1,0 +1,32 @@
+# Arkansas personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "AR"
+name = "Arkansas"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.5
+notes = [
+  "Personal exemption is a $29 credit per person.",
+  "50% of net capital gains excluded.",
+]
+
+[brackets]
+single = [[0, 0.02], [4000, 0.04], [8000, 0.059]]
+mfj    = [[0, 0.02], [4000, 0.04], [8000, 0.059]]
+
+[standard_deduction]
+single = 2200
+mfj    = 4400
+
+[exemption]
+credit_per_person = 29
+
+[[retirement_exclusions]]
+amount = 6000

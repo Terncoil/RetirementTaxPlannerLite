@@ -220,6 +220,37 @@ def test_auto_hide_check_box_shows_state(window):
     assert not panels.is_pinned(inputs) and inputs.parent() is window.centralWidget()
 
 
+@pytest.mark.parametrize("which", ["inputs_panel", "options_panel"])
+def test_switching_to_auto_hide_keeps_the_panel_open_until_dismissed(window, which):
+    """Ticking Auto hide on a pinned panel moves it over the graph; the move
+    must not count as focus leaving it, or the panel is marked closed while
+    it stays on screen, and the graph or the X can't hide it."""
+    from PySide6.QtTest import QTest
+
+    app = QtWidgets.QApplication.instance()
+    panels, panel = window.panels, getattr(window, which)
+    window.resize(1024, 740)
+    window.show()
+    panels.set_pinned(panel, True)
+    app.processEvents()
+    QTest.mouseClick(panel.auto_hide, QtCore.Qt.MouseButton.LeftButton)
+    app.processEvents()
+    assert not panels.is_pinned(panel)
+    assert panels.is_open(panel) and panel.isVisible()
+    QTest.mouseClick(panel.close_btn, QtCore.Qt.MouseButton.LeftButton)
+    app.processEvents()
+    assert not panels.is_open(panel) and panel.isHidden()
+    # Pin it again, switch to Auto hide, then click the graph.
+    panels.set_pinned(panel, True)
+    app.processEvents()
+    QTest.mouseClick(panel.auto_hide, QtCore.Qt.MouseButton.LeftButton)
+    app.processEvents()
+    graph = window.pages.currentWidget()
+    QTest.mouseClick(graph, QtCore.Qt.MouseButton.LeftButton, pos=graph.rect().center())
+    app.processEvents()
+    assert not panels.is_open(panel) and panel.isHidden()
+
+
 def test_forward_plan_page_does_not_widen_window(window):
     from rtpl.model.plan import Plan
 

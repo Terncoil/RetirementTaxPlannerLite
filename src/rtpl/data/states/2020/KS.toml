@@ -1,0 +1,31 @@
+# Kansas personal income tax, 2020.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "KS"
+name = "Kansas"
+year = 2020
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2020 (PDF)",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt with federal AGI up to $75,000 (all filing statuses), taxed in full above (a cliff).",
+  "Public pensions are exempt; private pensions and IRAs taxed (only those modelled).",
+]
+
+[brackets]
+single = [[0, 0.031], [15000, 0.0525], [30000, 0.057]]
+mfj    = [[0, 0.031], [30000, 0.0525], [60000, 0.057]]
+
+[standard_deduction]
+single = 3000
+mfj    = 7500
+
+[exemption]
+per_person = 2250
+
+[social_security]
+exempt_if_agi_at_most = { single = 75000, mfj = 75000 }

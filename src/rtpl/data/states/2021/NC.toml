@@ -1,0 +1,25 @@
+# North Carolina personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NC"
+name = "North Carolina"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+notes = [
+  "Social Security exempt; IRA withdrawals and most pensions taxed (Bailey-settlement government pensions exempt, not modelled).",
+]
+
+[brackets]
+single = [[0, 0.0525]]
+mfj    = [[0, 0.0525]]
+
+[standard_deduction]
+single = 10750
+mfj    = 21500
+hoh    = 16125

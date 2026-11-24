@@ -1,0 +1,31 @@
+# Nebraska personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NE"
+name = "Nebraska"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exempt with AGI up to about $44,460 single / $59,100 joint (2020 limits); above, 20% exempt (fully exempt from 2024).",
+]
+
+[brackets]
+single = [[0, 0.0246], [3440, 0.0351], [20590, 0.0501], [33180, 0.0684]]
+mfj    = [[0, 0.0246], [6860, 0.0351], [41190, 0.0501], [66360, 0.0684]]
+
+[standard_deduction]
+single = 7350
+mfj    = 14700
+
+[exemption]
+credit_per_person = 146
+
+[social_security]
+exempt_if_agi_at_most = { single = 44460, mfj = 59100 }
+exempt_fraction_above = 0.2
