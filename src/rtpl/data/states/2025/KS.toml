@@ -1,0 +1,27 @@
+# Kansas personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "KS"
+name = "Kansas"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Public pensions are exempt; private pensions and IRAs taxed (only those modelled).",
+]
+
+[brackets]
+single = [[0, 0.052], [23000, 0.0558]]
+mfj    = [[0, 0.052], [46000, 0.0558]]
+
+[standard_deduction]
+single = 3605
+mfj    = 8240
+
+[exemption]
+per_person = 9160

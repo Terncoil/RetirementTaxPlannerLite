@@ -1,0 +1,29 @@
+# Montana personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MT"
+name = "Montana"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Net long-term capital gains taxed at 3.0% / 4.1% (stacked on other income); qualified dividends taxed as ordinary.",
+  "65+ subtraction not modelled; Social Security taxed as federally.",
+]
+
+[brackets]
+single = [[0, 0.047], [21100, 0.059]]
+mfj    = [[0, 0.047], [42200, 0.059]]
+
+[standard_deduction]
+single = 15000
+mfj    = 30000
+
+[capital_gains_rates]
+single = [[0, 0.03], [47500, 0.041]]
+mfj    = [[0, 0.03], [95000, 0.041]]

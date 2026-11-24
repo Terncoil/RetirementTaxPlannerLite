@@ -1,0 +1,29 @@
+# California personal income tax, 2020.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CA"
+name = "California"
+year = 2020
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2020 (PDF)",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Top 13.3% includes the 1% Mental Health Services Tax over $1M.",
+  "Senior exemption credit and renter's credit not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [8809, 0.02], [20883, 0.04], [32960, 0.06], [45753, 0.08], [57824, 0.093], [295373, 0.103], [354445, 0.113], [590742, 0.123], [1000000, 0.133]]
+mfj    = [[0, 0.01], [17618, 0.02], [41766, 0.04], [65920, 0.06], [91506, 0.08], [115648, 0.093], [590746, 0.103], [708890, 0.113], [1000000, 0.123], [1181484, 0.133]]
+
+[standard_deduction]
+single = 4537
+mfj    = 9074
+
+[exemption]
+credit_per_person = 122

@@ -1,0 +1,23 @@
+# North Dakota personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "ND"
+name = "North Dakota"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.4
+notes = []
+
+[brackets]
+single = [[0, 0.011], [40525, 0.0204], [98100, 0.0227], [204675, 0.0264], [445000, 0.029]]
+mfj    = [[0, 0.011], [67700, 0.0204], [163550, 0.0227], [249150, 0.0264], [445000, 0.029]]
+
+[standard_deduction]
+single = 12950
+mfj    = 25900

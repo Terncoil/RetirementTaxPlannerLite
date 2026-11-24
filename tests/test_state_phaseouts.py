@@ -54,10 +54,10 @@ def test_phaseout_income_must_be_known():
         _parse_phaseout({"start": {"single": 1}, "rate": 1, "income": "state_income"}, federal_only=True)
 
 
-def utah_couple(state="UT"):
+def utah_couple(state="UT", year=2025):
     """Retired couple over 65 with $55K of Social Security (the slide's example)."""
     return Profile(
-        year=2025,
+        year=year,
         filing_status="mfj",
         state=state,
         people=[
@@ -68,7 +68,7 @@ def utah_couple(state="UT"):
 
 
 def test_utah_credits_shape_the_marginal_rate(lib):
-    s = build_marginal_series(utah_couple(), lib, x_max=250_000, step=100)
+    s = build_marginal_series(utah_couple(year=2026), lib, x_max=250_000, step=100)
     ut = 0.0445
     taxed_ss = 1.85  # each IRA dollar also makes 85 cents of benefits taxable
 

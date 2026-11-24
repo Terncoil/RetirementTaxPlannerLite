@@ -1,0 +1,27 @@
+# Oregon personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "OR"
+name = "Oregon"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Retirement income credit, federal tax subtraction and local taxes not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0475], [4300, 0.0675], [10750, 0.0875], [125000, 0.099]]
+mfj    = [[0, 0.0475], [8600, 0.0675], [21500, 0.0875], [250000, 0.099]]
+
+[standard_deduction]
+single = 2745
+mfj    = 5495
+
+[exemption]
+credit_per_person = 249

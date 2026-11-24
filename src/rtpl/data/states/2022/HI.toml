@@ -1,0 +1,33 @@
+# Hawaii personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "HI"
+name = "Hawaii"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+capital_gains_max_rate = 0.0725
+notes = [
+  "Employer pensions exempt; IRA withdrawals taxed.",
+  "Long-term gains capped at 7.25%.",
+]
+
+[brackets]
+single = [[0, 0.014], [2400, 0.032], [4800, 0.055], [9600, 0.064], [14400, 0.068], [19200, 0.072], [24000, 0.076], [36000, 0.079], [48000, 0.0825], [150000, 0.09], [175000, 0.1], [200000, 0.11]]
+mfj    = [[0, 0.014], [4800, 0.032], [9600, 0.055], [19200, 0.064], [28800, 0.068], [38400, 0.072], [48000, 0.076], [72000, 0.079], [96000, 0.0825], [300000, 0.09], [350000, 0.1], [400000, 0.11]]
+
+[standard_deduction]
+single = 2200
+mfj    = 4400
+
+[exemption]
+per_person = 1144
+
+[[retirement_exclusions]]
+amount = "unlimited"
+applies_to = ["pension"]

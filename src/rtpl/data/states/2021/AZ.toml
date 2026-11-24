@@ -1,0 +1,22 @@
+# Arizona personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "AZ"
+name = "Arizona"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+notes = []
+
+[brackets]
+single = [[0, 0.0259], [27272, 0.0334], [54544, 0.0417], [163632, 0.045]]
+mfj    = [[0, 0.0259], [54544, 0.0334], [109088, 0.0417], [327263, 0.045]]
+
+[standard_deduction]
+single = 12550
+mfj    = 25100

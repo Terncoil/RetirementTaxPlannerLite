@@ -1,0 +1,25 @@
+# Nebraska personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NE"
+name = "Nebraska"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = []
+
+[brackets]
+single = [[0, 0.0246], [4030, 0.0351], [24120, 0.0501], [38870, 0.052]]
+mfj    = [[0, 0.0246], [8040, 0.0351], [48250, 0.0501], [77730, 0.052]]
+
+[standard_deduction]
+single = 8600
+mfj    = 17200
+
+[exemption]
+credit_per_person = 171

@@ -1,0 +1,30 @@
+# South Carolina personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "SC"
+name = "South Carolina"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.44
+notes = [
+  "$15,000 deduction per person at 65+ (combined with the retirement deduction).",
+  "44% of net capital gains excluded.",
+]
+
+[brackets]
+single = [[0, 0.0], [3200, 0.03], [16040, 0.065]]
+mfj    = [[0, 0.0], [3200, 0.03], [16040, 0.065]]
+
+[standard_deduction]
+single = 12950
+mfj    = 25900
+
+[age_deduction]
+amount = 15000
+min_age = 65

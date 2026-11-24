@@ -33,9 +33,11 @@ def test_year_without_a_file_uses_the_nearest_law(lib):
     assert any("uses the" in n for n in later.chart_notes)
     earlier = lib.state("MI", 2019)
     assert earlier.year == 2020 and any("no earlier law" in n for n in earlier.chart_notes)
-    # A state with only a 2026 file uses it for every year, with a footnote.
-    only = lib.state("CA", 2023)
-    assert only.year == 2026 and only.law_year_requested == 2023
+    # Every state with an income tax has a file for each year from 2020.
+    for code in lib.available_states():
+        years = lib.state_years(code)
+        if years:
+            assert set(range(2020, 2027)) <= set(years), code
 
 
 def test_user_files_override_by_year_and_undated(tmp_path):
@@ -113,3 +115,40 @@ def test_michigan_2023_single_filer_matches_the_reference_graph(lib):
     assert rate(36_000) == pytest.approx(0.448, abs=0.003)
     assert rate(50_000) == pytest.approx(0.261, abs=0.003)
     assert rate(90_000) == pytest.approx(0.281, abs=0.003)
+
+
+def _retiree_tax(lib, code, year, fs="single", agi_ss=30_000, ira=40_000, age=68):
+    p = make(year=year, fs=fs, state=code,
+             people=[Person(birth_year=year - age, social_security=agi_ss, ira_distributions=ira)])
+    r = compute_tax(p, lib.federal(year), lib.state(code, year))
+    return r
+
+
+def test_social_security_rules_change_by_year(lib):
+    # Kansas taxed benefits above $75,000 of AGI until 2024.
+    assert _retiree_tax(lib, "KS", 2023, ira=80_000).state_tax > _retiree_tax(lib, "KS", 2024, ira=80_000).state_tax
+    # West Virginia exempts 35% (2024) and 65% (2025) of benefits above its limit.
+    wv = lib.state("WV", 2024)
+    assert wv.social_security.exempt_fraction_above == 0.35
+    assert lib.state("WV", 2025).social_security.exempt_fraction_above == 0.65
+    # New Mexico exempts benefits from 2022, Colorado at 65+ from 2022, North Dakota from 2021.
+    assert lib.state("NM", 2021).social_security.exempt_if_agi_at_most is None
+    assert lib.state("NM", 2022).social_security.exempt_if_agi_at_most is not None
+    assert lib.state("CO", 2021).social_security.exempt_from_age is None
+    assert lib.state("CO", 2022).social_security.exempt_from_age == 65
+    assert lib.state("ND", 2020).taxes_social_security and not lib.state("ND", 2021).taxes_social_security
+
+
+def test_retirement_exclusions_change_by_year(lib):
+    # Iowa: $6,000 at 55+ until 2022, then all retirement income.
+    assert lib.state("IA", 2022).retirement_exclusions[0].amount == 6000
+    assert lib.state("IA", 2023).retirement_exclusions[0].amount == float("inf")
+    # Wisconsin's $24,000 subtraction at 67+ starts in 2025.
+    assert not lib.state("WI", 2024).retirement_exclusions
+    assert lib.state("WI", 2025).retirement_exclusions[0].amount == 24000
+    # Connecticut phases in IRA distributions from 2023.
+    assert len(lib.state("CT", 2022).retirement_exclusions) == 1
+    assert len(lib.state("CT", 2023).retirement_exclusions) == 2
+    # Washington's capital gains tax starts in 2022.
+    assert lib.state("WA", 2021).gains_only_tax is None
+    assert lib.state("WA", 2022).gains_only_deduction == 250_000

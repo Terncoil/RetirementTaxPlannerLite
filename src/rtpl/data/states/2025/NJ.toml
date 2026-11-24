@@ -1,0 +1,35 @@
+# New Jersey personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NJ"
+name = "New Jersey"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+  "NJ Division of Taxation, Retirement Income (pension exclusion), 2025 NJ-1040",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Pension/IRA exclusion at 62+: up to $100,000 joint / $75,000 single with total income to $100K, then a share of it to $150K, then none (cliffs). Total income is taken as AGI less taxable Social Security.",
+  "Other retirement income exclusion and extra $1,000 exemption at 65+ not modelled.",
+]
+
+[brackets]
+single = [[0, 0.014], [20000, 0.0175], [35000, 0.035], [40000, 0.05525], [75000, 0.0637], [500000, 0.0897], [1000000, 0.1075]]
+mfj    = [[0, 0.014], [20000, 0.0175], [50000, 0.0245], [70000, 0.035], [80000, 0.05525], [150000, 0.0637], [500000, 0.0897], [1000000, 0.1075]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[exemption]
+per_person = 1000
+
+[[retirement_exclusions]]
+min_age = 62
+per_return = { single = 75000, mfj = 100000, mfs = 50000, hoh = 75000 }
+phaseout = { income = "agi_ex_ss", tiers = [{ up_to = { single = 100000, mfj = 100000 }, keep = 1 }, { up_to = { single = 125000, mfj = 125000 }, keep = { single = 0.375, mfj = 0.5, mfs = 0.25 } }, { up_to = { single = 150000, mfj = 150000 }, keep = { single = 0.1875, mfj = 0.25, mfs = 0.125 } }] }

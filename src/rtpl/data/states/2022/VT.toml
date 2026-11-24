@@ -1,0 +1,31 @@
+# Vermont personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "VT"
+name = "Vermont"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = true
+notes = [
+  "Social Security exemption limits approximated; capital gains exclusion not modelled.",
+]
+
+[brackets]
+single = [[0, 0.0335], [40950, 0.066], [99200, 0.076], [206950, 0.0875]]
+mfj    = [[0, 0.0335], [68400, 0.066], [165350, 0.076], [251950, 0.0875]]
+
+[standard_deduction]
+single = 6350
+mfj    = 12700
+
+[exemption]
+per_person = 4350
+
+[social_security]
+exempt_if_agi_at_most = { single = 45000, mfj = 60000 }
+phaseout_width = { single = 10000, mfj = 10000 }

@@ -1,0 +1,29 @@
+# California personal income tax, 2022.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CA"
+name = "California"
+year = 2022
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2022",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Top 13.3% includes the 1% Mental Health Services Tax over $1M.",
+  "Senior exemption credit and renter's credit not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [9325, 0.02], [22107, 0.04], [34892, 0.06], [48435, 0.08], [61214, 0.093], [312686, 0.103], [375221, 0.113], [625369, 0.123], [1000000, 0.133]]
+mfj    = [[0, 0.01], [18650, 0.02], [44214, 0.04], [69784, 0.06], [96870, 0.08], [122428, 0.093], [625372, 0.103], [750442, 0.113], [1000000, 0.123], [1250738, 0.133]]
+
+[standard_deduction]
+single = 4803
+mfj    = 9606
+
+[exemption]
+credit_per_person = 129

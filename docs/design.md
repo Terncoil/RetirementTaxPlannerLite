@@ -90,7 +90,7 @@ phase-outs, fixed in statute). A `[policy]` table holds switches:
   back the 400% FPL cliff)
 
 **State files** (`data/states/<year>/XX.toml`, all 50 states plus DC for
-2026, more years for some states) hold brackets, standard deduction, personal exemptions (as deductions or
+2020 to 2026) hold brackets, standard deduction, personal exemptions (as deductions or
 credits), a Social Security rule (exempt, taxed, exempt from an age, or
 exempt below an AGI limit with an optional phase-out), per-person
 pension/IRA exclusions with minimum ages and qualifying birth years, an
@@ -147,6 +147,18 @@ inclusive, and `born_before`), judged by the person or, with
 ["any"]` makes it a deduction against all income; and of the exclusions
 that share a `group` the return uses the one that excludes the most.
 Michigan uses all three for its tiers and the 2023-2025 phase-in.
+
+The 2020-2025 files take brackets, standard deductions and exemptions
+from the Tax Foundation's table for each year (as of January 1), with
+rate cuts passed later that applied to the whole year (Arkansas, Georgia,
+Kansas, North Dakota, Ohio, South Carolina, Utah, West Virginia and
+others) put in their place. Retiree rules follow each state's history
+where it changed: Social Security exemptions (Colorado, Kansas,
+Minnesota, Missouri, Nebraska, New Mexico, North Dakota, Rhode Island,
+Vermont, West Virginia, Utah's credit), retirement exclusions
+(Connecticut, Iowa, Michigan, New Jersey, Rhode Island, Wisconsin) and
+Washington's capital gains tax from 2022. Each file's `notes` say what is
+approximate.
 
 **Projection.** Years without a file are built from the newest enacted
 year by `federal/projection.toml`: indexed amounts (brackets, standard

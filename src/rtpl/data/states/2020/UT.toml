@@ -1,0 +1,38 @@
+# Utah personal income tax, 2020.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "UT"
+name = "Utah"
+year = 2020
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2020 (PDF)",
+  "2025 TC-40 instructions (retirement credit)",
+]
+taxes_social_security = true
+notes = [
+  "Taxpayer credit: 6% of the federal standard (or itemized) deduction, less 1.3% of Utah income over the base; the 6% of dependents' exemptions is not modelled.",
+  "Retirement credit (born before 1953) phases out at 2.5 cents per dollar of income over its limit; no Social Security credit before 2021.",
+]
+
+[brackets]
+single = [[0, 0.0495]]
+mfj    = [[0, 0.0495]]
+
+[standard_deduction]
+single = 0
+mfj    = 0
+
+[[credits]]
+name = "Taxpayer credit"
+federal_deduction_rate = 0.06
+phaseout = { start = { single = 14601, mfj = 29202, hoh = 21902 }, rate = 0.013, income = "state_income" }
+
+[[credits]]
+name = "Retirement credit"
+per_person = 450
+born_before = 1953
+group = "retirement"
+phaseout = { start = { single = 25000, mfj = 32000, hoh = 32000, mfs = 16000 }, rate = 0.025, income = "magi" }

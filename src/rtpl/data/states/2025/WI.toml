@@ -1,0 +1,34 @@
+# Wisconsin personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "WI"
+name = "Wisconsin"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+  "2025 Form 1 instructions (retirement income subtraction at 67+)",
+]
+taxes_social_security = false
+capital_gains_exclusion = 0.3
+notes = [
+  "Standard deduction phases out with income (not modelled); 30% of long-term gains excluded.",
+  "Up to $24,000 of pension/IRA income per person at 67+ is subtracted (2025 Act 15); the $5,000 income-limited subtraction is not modelled.",
+]
+
+[brackets]
+single = [[0, 0.035], [14680, 0.044], [50480, 0.053], [323290, 0.0765]]
+mfj    = [[0, 0.035], [19580, 0.044], [67300, 0.053], [431060, 0.0765]]
+
+[standard_deduction]
+single = 13560
+mfj    = 25110
+
+[exemption]
+per_person = 700
+
+[[retirement_exclusions]]
+amount = 24000
+min_age = 67

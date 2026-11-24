@@ -1,0 +1,28 @@
+# Montana personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MT"
+name = "Montana"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = true
+notes = [
+  "Before 2024: capital gains taxed as ordinary income (the 2% capital gains credit is not modelled); standard deduction is 20% of AGI between limits (modelled as the maximum); pension exclusion and federal tax deduction not modelled.",
+  "Social Security taxed as federally (Montana's own formula not modelled).",
+]
+
+[brackets]
+single = [[0, 0.01], [3100, 0.02], [5500, 0.03], [8400, 0.04], [11300, 0.05], [14500, 0.06], [18700, 0.069]]
+mfj    = [[0, 0.01], [3100, 0.02], [5500, 0.03], [8400, 0.04], [11300, 0.05], [14500, 0.06], [18700, 0.069]]
+
+[standard_deduction]
+single = 4790
+mfj    = 9580
+
+[exemption]
+per_person = 2560

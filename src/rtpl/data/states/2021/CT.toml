@@ -1,0 +1,40 @@
+# Connecticut personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CT"
+name = "Connecticut"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+  "CT OLR report 2025-R-0152 (pension, IRA and Social Security deductions)",
+]
+taxes_social_security = true
+notes = [
+  "Personal exemption falls $1,000 for each $1,000 of income over the limit; modelled as a smooth $1 per $1. The personal tax credit is not modelled.",
+  "42% of pension income is deductible with AGI under $75,000 single / $100,000 joint (a cliff); IRA distributions are taxed. Benefit recapture not modelled.",
+]
+chart_notes = [
+  "Personal exemption phase-out smoothed (the law takes $1,000 off for each $1,000 of income over the limit, in steps).",
+]
+
+[brackets]
+single = [[0, 0.03], [10000, 0.05], [50000, 0.055], [100000, 0.06], [200000, 0.065], [250000, 0.069], [500000, 0.0699]]
+mfj    = [[0, 0.03], [20000, 0.05], [100000, 0.055], [200000, 0.06], [400000, 0.065], [500000, 0.069], [1000000, 0.0699]]
+
+[standard_deduction]
+single = 15000
+mfj    = 24000
+hoh    = 19000
+mfs    = 12000
+phaseout = { start = { single = 30000, mfj = 48000, hoh = 38000, mfs = 24000 }, rate = 1, income = "state_income" }
+
+[social_security]
+exempt_if_agi_at_most = { single = 75000, mfj = 100000 }
+exempt_fraction_above = 0.75
+
+[[retirement_exclusions]]
+applies_to = ["pension"]
+phaseout = { income = "agi", tiers = [{ up_to = { single = 74999.99, mfj = 99999.99 }, keep = 0.42 }] }

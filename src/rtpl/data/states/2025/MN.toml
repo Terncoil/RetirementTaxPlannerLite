@@ -1,0 +1,31 @@
+# Minnesota personal income tax, 2025.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "MN"
+name = "Minnesota"
+year = 2025
+sources = [
+  "Tax Foundation, 2025 State Income Tax Rates and Brackets",
+]
+taxes_social_security = true
+notes = [
+  "Social Security subtraction in full with AGI up to $84,490 single / $108,320 joint; its phase-out (10% for each $4,000 or part of $4,000 over the limit) is smoothed into a straight line.",
+]
+chart_notes = [
+  "Social Security subtraction phase-out smoothed (the law takes 10% off for each $4,000 of AGI over the limit, in steps).",
+]
+
+[brackets]
+single = [[0, 0.0535], [32570, 0.068], [106990, 0.0785], [198630, 0.0985]]
+mfj    = [[0, 0.0535], [47620, 0.068], [189180, 0.0785], [330410, 0.0985]]
+
+[standard_deduction]
+single = 14950
+mfj    = 29900
+
+[social_security]
+exempt_if_agi_at_most = { single = 84490, mfj = 108320 }
+phaseout_width = { single = 40000, mfj = 40000 }

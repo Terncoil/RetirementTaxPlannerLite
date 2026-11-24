@@ -1,0 +1,25 @@
+# North Carolina personal income tax, 2023.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "NC"
+name = "North Carolina"
+year = 2023
+sources = [
+  "Tax Foundation, 2023 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = [
+  "Social Security exempt; IRA withdrawals and most pensions taxed (Bailey-settlement government pensions exempt, not modelled).",
+]
+
+[brackets]
+single = [[0, 0.0475]]
+mfj    = [[0, 0.0475]]
+
+[standard_deduction]
+single = 12750
+mfj    = 25500
+hoh    = 19125

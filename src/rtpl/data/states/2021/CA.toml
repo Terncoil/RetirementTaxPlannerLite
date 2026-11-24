@@ -1,0 +1,29 @@
+# California personal income tax, 2021.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "CA"
+name = "California"
+year = 2021
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2021",
+]
+taxes_social_security = false
+taxes_hsa_contributions = true
+notes = [
+  "Top 13.3% includes the 1% Mental Health Services Tax over $1M.",
+  "Senior exemption credit and renter's credit not modelled.",
+]
+
+[brackets]
+single = [[0, 0.01], [8932, 0.02], [21175, 0.04], [33421, 0.06], [46394, 0.08], [58634, 0.093], [299508, 0.103], [359407, 0.113], [599012, 0.123], [1000000, 0.133]]
+mfj    = [[0, 0.01], [17864, 0.02], [42350, 0.04], [66842, 0.06], [92788, 0.08], [117268, 0.093], [599016, 0.103], [718814, 0.113], [1000000, 0.123], [1198024, 0.133]]
+
+[standard_deduction]
+single = 4601
+mfj    = 9202
+
+[exemption]
+credit_per_person = 124

@@ -1,0 +1,22 @@
+# Idaho personal income tax, 2020.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "ID"
+name = "Idaho"
+year = 2020
+sources = [
+  "Tax Foundation, State Individual Income Tax Rates and Brackets for 2020 (PDF)",
+]
+taxes_social_security = false
+notes = []
+
+[brackets]
+single = [[0, 0.01125], [1541, 0.03125], [3081, 0.03625], [4622, 0.04625], [6162, 0.05625], [7703, 0.06625], [11554, 0.06925]]
+mfj    = [[0, 0.01125], [3082, 0.03125], [6162, 0.03625], [9244, 0.04625], [12324, 0.05625], [15406, 0.06625], [23108, 0.06925]]
+
+[standard_deduction]
+single = 12400
+mfj    = 24800

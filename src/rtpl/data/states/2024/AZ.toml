@@ -1,0 +1,22 @@
+# Arizona personal income tax, 2024.
+# Built from the sources below and the 2026 file's retiree rules, changed
+# where the law differed this year; edit freely. hoh and mfs use the
+# single values unless listed. Rates enacted later in the year but
+# applying to all of it replace the table's (as of Jan 1) rates.
+
+code = "AZ"
+name = "Arizona"
+year = 2024
+sources = [
+  "Tax Foundation, 2024 State Income Tax Rates and Brackets",
+]
+taxes_social_security = false
+notes = []
+
+[brackets]
+single = [[0, 0.025]]
+mfj    = [[0, 0.025]]
+
+[standard_deduction]
+single = 14600
+mfj    = 29200
