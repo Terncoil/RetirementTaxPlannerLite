@@ -412,6 +412,22 @@ class RetirementExclusion:
     # A cap for the whole return by filing status instead of ``amount`` per
     # person (New Jersey's pension exclusion).
     per_return: dict[str, float] | None = None
+    # Birth years that qualify: ``born_from`` <= birth year < ``born_before``.
+    born_from: int | None = None
+    born_before: int | None = None
+    # Whose birth year counts: "self", or "older_spouse" (Michigan judges a
+    # joint return by the older spouse).
+    birth_year_of: str = "self"
+    # Of the exclusions in one group, each person gets only the largest
+    # (Michigan's choice between its retirement deductions).
+    group: str | None = None
+
+    def qualifies(self, birth_year: int, age: int) -> bool:
+        if age < self.min_age:
+            return False
+        if self.born_from is not None and birth_year < self.born_from:
+            return False
+        return self.born_before is None or birth_year < self.born_before
 
 
 @dataclass(frozen=True)
@@ -461,6 +477,9 @@ class StateLaw:
     # (a smoothed phase-out, say). Remove one when the file gets the exact rule.
     chart_notes: tuple[str, ...] = ()
     sources: tuple[str, ...] = ()
+    # The tax year asked for when it has no file of its own and ``year``
+    # is the file used in its place.
+    law_year_requested: int | None = None
 
     @property
     def label(self) -> str:
@@ -493,6 +512,13 @@ def _status_table(table: dict | None, cast=float, default=0.0) -> dict[str, floa
     return out
 
 
+def _choice(raw: dict, key: str, allowed: tuple[str, ...]) -> str:
+    value = str(raw.get(key, allowed[0]))
+    if value not in allowed:
+        raise ValueError(f"{key} must be one of {', '.join(allowed)}, not {value!r}")
+    return value
+
+
 def _parse_state(raw: dict) -> StateLaw:
     surcharges = tuple(
         (float(v["rate"]), float(v["threshold"])) for v in raw.get("surcharges", {}).values()
@@ -520,8 +546,15 @@ def _parse_state(raw: dict) -> StateLaw:
                 min_age=int(ex.get("min_age", 0)),
                 applies_to=tuple(ex.get("applies_to", ("pension", "ira"))),
                 phaseout=_parse_phaseout(ex.get("phaseout"), federal_only=True),
+                born_from=ex.get("born_from"),
+                born_before=ex.get("born_before"),
+                birth_year_of=_choice(ex, "birth_year_of", ("self", "older_spouse")),
+                group=ex.get("group"),
             )
         )
+        bad = set(exclusions[-1].applies_to) - {"pension", "ira", "any"}
+        if bad:
+            raise ValueError(f"retirement exclusion applies_to has unknown kinds: {', '.join(sorted(bad))}")
     age_ded = raw.get("age_deduction")
     credits = []
     for c in raw.get("credits", []):
@@ -595,6 +628,7 @@ class TaxLawLibrary:
     _federal_raw: dict[int, dict] = field(default_factory=dict, init=False, repr=False)
     _cache: dict[tuple[int, float], FederalLaw] = field(default_factory=dict, init=False, repr=False)
     _projection: dict = field(default_factory=dict, init=False, repr=False)
+    _state_cache: dict[tuple[str, int | None], StateLaw] = field(default_factory=dict, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.user_dirs = [Path(p) for p in self.user_dirs]
@@ -733,8 +767,12 @@ class TaxLawLibrary:
         codes: set[str] = set()
         for root in self._roots():
             sdir = root / "states"
-            if sdir.is_dir():
-                codes.update(p.stem.upper() for p in sdir.glob("*.toml") if not p.stem.startswith("_"))
+            if not sdir.is_dir():
+                continue
+            codes.update(p.stem.upper() for p in sdir.glob("*.toml") if not p.stem.startswith("_"))
+            for ydir in sdir.iterdir():
+                if ydir.is_dir() and ydir.name.isdigit():
+                    codes.update(p.stem.upper() for p in ydir.glob("*.toml") if not p.stem.startswith("_"))
         return sorted(codes | set(self._no_tax_codes()))
 
     def _no_tax_codes(self) -> list[str]:
@@ -744,17 +782,70 @@ class TaxLawLibrary:
         with p.open("rb") as fh:
             return [c.upper() for c in tomllib.load(fh).get("codes", [])]
 
-    def state(self, code: str | None) -> StateLaw | None:
+    def state_years(self, code: str) -> dict[int, Path]:
+        """Files for one state by tax year, user folders winning over shipped ones."""
+        code = code.upper()
+        found: dict[int, Path] = {}
+        for root in reversed(self._roots()):
+            sdir = root / "states"
+            if not sdir.is_dir():
+                continue
+            for ydir in sdir.iterdir():
+                p = ydir / f"{code}.toml"
+                if ydir.is_dir() and ydir.name.isdigit() and p.is_file():
+                    found[int(ydir.name)] = p
+        return dict(sorted(found.items()))
+
+    def state(self, code: str | None, year: int | None = None) -> StateLaw | None:
+        """State law for ``year`` (the newest file when ``year`` is None).
+
+        Files live in ``states/<year>/XX.toml``. A year without a file uses
+        the newest earlier file (a later year keeps the newest law), or the
+        earliest file for a year before them all. A ``states/XX.toml`` with
+        no year folder in a user folder replaces the shipped files for every
+        year, as it did before state law was kept by year.
+        """
         if not code:
             return None
         code = code.upper()
-        p = self._first_existing(f"states/{code}.toml")
-        if p:
-            with p.open("rb") as fh:
-                return _parse_state(tomllib.load(fh))
-        if code in self._no_tax_codes():
-            return _no_tax_state(code)
-        raise KeyError(f"No state tax data for {code}")
+        key = (code, year)
+        if key not in self._state_cache:
+            self._state_cache[key] = self._build_state(code, year)
+        return self._state_cache[key]
+
+    def _build_state(self, code: str, year: int | None) -> StateLaw:
+        for root in self.user_dirs:
+            p = root / "states" / f"{code}.toml"
+            if p.is_file():
+                with p.open("rb") as fh:
+                    return _parse_state(tomllib.load(fh))
+        files = self.state_years(code)
+        if not files:
+            if code in self._no_tax_codes():
+                return _no_tax_state(code)
+            raise KeyError(f"No state tax data for {code}")
+        years = list(files)
+        if year is None or year >= years[-1]:
+            used = years[-1]
+        elif year in files:
+            used = year
+        elif year < years[0]:
+            used = years[0]
+        else:
+            used = max(y for y in years if y < year)
+        with files[used].open("rb") as fh:
+            raw = tomllib.load(fh)
+        if raw.get("year") not in (None, used):
+            raise ValueError(f"{files[used]} says year {raw['year']} but is in the {used} folder")
+        raw["year"] = used
+        law = _parse_state(raw)
+        if year is not None and year != used and law.has_income_tax:
+            from dataclasses import replace
+
+            note = f"{year} uses the {used} state tax law (the newest earlier law on file)." if used < year \
+                else f"{year} uses the {used} state tax law (no earlier law on file)."
+            law = replace(law, chart_notes=(*law.chart_notes, note), law_year_requested=year)
+        return law
 
 
 def _replace(law: FederalLaw, **changes) -> FederalLaw:

@@ -112,14 +112,15 @@ field, the yearly steps and the simplifications.
 ## Tax law files
 
 Federal law for each year is in `src/rtpl/data/federal/<year>.toml`, states
-in `src/rtpl/data/states/<code>.toml`. Later years are projected with
-inflation using `projection.toml`. To change the law without editing the
+in `src/rtpl/data/states/<year>/<code>.toml`. Later federal years are
+projected with inflation using `projection.toml`; a state year without a
+file uses the newest earlier one. To change the law without editing the
 package, put your own copy of a file in the `taxlaw/federal` or
 `taxlaw/states` folder of your user config directory; it wins over the
 shipped one.
 
-Included: federal 2025 and 2026, and 2026 files for all 50 states plus
-DC (brackets, deductions and exemptions from the Tax Foundation's 2026
+Included: federal 2020 to 2027, Michigan 2020 to 2026, and 2026 files for
+all 50 states plus DC (brackets, deductions and exemptions from the Tax Foundation's 2026
 table, plus Social Security and pension/IRA exclusions for retirees, and
 Washington's capital gains tax). Each state file lists what it leaves out
 under `notes`; hover over the state checkbox in the app to read them.

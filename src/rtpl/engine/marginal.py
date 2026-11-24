@@ -199,7 +199,7 @@ def build_marginal_series(
     if step <= 0 or x_max <= 0:
         raise ValueError("x_max and step must be positive")
     law = library.federal(profile.year, profile.inflation)
-    state = library.state(profile.state) if include_state and profile.state else None
+    state = library.state(profile.state, profile.year) if include_state and profile.state else None
 
     n = int(round(x_max / step))
     grid = [i * step for i in range(n + 1)]

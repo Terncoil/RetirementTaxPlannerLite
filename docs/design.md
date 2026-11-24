@@ -45,7 +45,7 @@ src/rtpl/
   cli.py                  headless marginal chart export (rtpl-chart)
   plan_cli.py             headless plan export: graphs and CSV (rtpl-plan)
   data/federal/*.toml     per-year federal law + projection rules
-  data/states/*.toml      per-state law
+  data/states/YYYY/*.toml per-state law by tax year
   data/rmd/tables.toml    IRS life expectancy tables
   data/themes/default.toml
 ```
@@ -89,11 +89,12 @@ phase-outs, fixed in statute). A `[policy]` table holds switches:
 * `aca_enhanced_subsidies` (true for 2025; false for 2026, which brings
   back the 400% FPL cliff)
 
-**State files** (`data/states/XX.toml`, all 50 states plus DC for 2026)
-hold brackets, standard deduction, personal exemptions (as deductions or
+**State files** (`data/states/<year>/XX.toml`, all 50 states plus DC for
+2026, more years for some states) hold brackets, standard deduction, personal exemptions (as deductions or
 credits), a Social Security rule (exempt, taxed, exempt from an age, or
 exempt below an AGI limit with an optional phase-out), per-person
-pension/IRA exclusions with minimum ages, an age-based deduction, capital
+pension/IRA exclusions with minimum ages and qualifying birth years, an
+age-based deduction, capital
 gains exclusions or rate caps, a gains-only tax (Washington), and
 nonrefundable `[[credits]]` (a flat amount, an amount per person, a share
 of the federal deduction, or a share of the Social Security the state
@@ -132,8 +133,20 @@ forward plan does not model yet for plans that start in those years:
 * 2021–2024: the IRS waivers of yearly inherited IRA RMDs under the
   10-year rule (owner had started RMDs, death in 2020 or later).
 
-State files hold one year (2026) and the app uses it for every year, so
-historical state tax needs a year-aware state loader first.
+**State law by year.** Each state's files sit in a folder per tax year.
+A year without a file uses the newest earlier one (so a state only needs
+a file in the years its law changed, and a future year keeps the newest
+law), or the earliest one for a year before them all; the marginal graph
+then says in a footnote which year's law it used. State amounts are not
+projected with inflation. A `states/XX.toml` outside a year folder in the
+user's `taxlaw` folder replaces that state's shipped files for every year.
+
+A retirement exclusion can be limited to birth years (`born_from`,
+inclusive, and `born_before`), judged by the person or, with
+`birth_year_of = "older_spouse"`, by the older spouse; `applies_to =
+["any"]` makes it a deduction against all income; and of the exclusions
+that share a `group` the return uses the one that excludes the most.
+Michigan uses all three for its tiers and the 2023-2025 phase-in.
 
 **Projection.** Years without a file are built from the newest enacted
 year by `federal/projection.toml`: indexed amounts (brackets, standard
