@@ -1464,6 +1464,11 @@ class PlanEditor(QWidget):
                 self._describe(g.child(i))
         self.tree.blockSignals(False)
         self.tree.viewport().update()
+        # The open item's form shows the first year and names too (such as
+        # "Balance on Jan 1, <year>"), so fill it again.
+        form = self.stack.currentWidget()
+        if isinstance(form, ItemForm) and form.obj is not None and self.plan is not None:
+            form.load(self.plan, form.obj)
 
     def _describe(self, item: QTreeWidgetItem) -> None:
         key, obj = item.data(0, ROLE)
