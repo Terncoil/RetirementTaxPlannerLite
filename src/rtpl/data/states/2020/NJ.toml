@@ -15,7 +15,8 @@ taxes_social_security = false
 taxes_hsa_contributions = true
 notes = [
   "Pension/IRA exclusion at 62+: up to $100,000 joint / $75,000 single with total income to $100K, none above (a cliff; the partial exclusion to $150K starts in 2021). Total income is taken as AGI less taxable Social Security.",
-  "Other retirement income exclusion and extra $1,000 exemption at 65+ not modelled.",
+  "Extra $1,000 exemption at 65+ (each spouse on a joint return).",
+  "Other retirement income exclusion (unused pension exclusion applied to other income) not modelled.",
 ]
 
 [brackets]
@@ -28,6 +29,11 @@ mfj    = 0
 
 [exemption]
 per_person = 1000
+
+# Senior exemption: $1,000 more for each person 65 or older.
+[age_deduction]
+amount = 1000
+min_age = 65
 
 [[retirement_exclusions]]
 min_age = 62

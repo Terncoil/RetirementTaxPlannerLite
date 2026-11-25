@@ -147,6 +147,9 @@ inclusive, and `born_before`), judged by the person or, with
 ["any"]` makes it a deduction against all income; and of the exclusions
 that share a `group` the return uses the one that excludes the most.
 Michigan uses all three for its tiers and the 2023-2025 phase-in.
+A phase-out normally scales the capped amount; `phased_share_of =
+"income"` scales all the eligible income instead, with no cap, as New
+Jersey's tiers above $100K take 37.5% (then 18.75%) of all pension income.
 
 The 2020-2025 files take brackets, standard deductions and exemptions
 from the Tax Foundation's table for each year (as of January 1), with
