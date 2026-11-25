@@ -482,3 +482,59 @@ def test_aca_and_education_fields_round_trip(window, tmp_path):
     window.form.education_last.setValue(window.form.education_last.minimum())
     assert window.form.profile().household.education_last_year is None
     assert window.form.education_last.text() == "This year only"
+
+
+def test_new_profile_defaults(window, monkeypatch):
+    """View > New Profile Defaults sets what File > New starts from, kept
+    in the settings folder rather than in any profile file."""
+    from rtpl.app import main_window as mw
+
+    builtin = window._starter_profile()
+    assert window._new_profile_defaults().to_dict() == builtin.to_dict()
+
+    def single_ny(dlg):
+        f = dlg.form
+        f.filing.setCurrentIndex(f.filing.findData("single"))
+        f.state.setCurrentIndex(f.state.findData("NY"))
+        f.inflation.setValue(3.0)
+        f.person_boxes[0].money["social_security"].setValue(0)
+        return QtWidgets.QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(mw.NewProfileDefaultsDialog, "exec", single_ny)
+    window.edit_new_profile_defaults()
+    assert window.new_defaults_path.exists()
+    window.new_profile()
+    p = window.form.profile()
+    assert (p.filing_status, p.state, p.inflation) == ("single", "NY", 0.03)
+    assert len(p.people) == 1 and p.people[0].social_security == 0
+
+    # The open profile is untouched by later edits to the defaults, and
+    # resetting to the built-in example removes the settings file.
+    def reset(dlg):
+        dlg.form.set_profile(dlg._builtin)
+        return QtWidgets.QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(mw.NewProfileDefaultsDialog, "exec", reset)
+    window.edit_new_profile_defaults()
+    assert not window.new_defaults_path.exists()
+    assert window.form.profile().state == "NY"
+
+    # The tax year follows the calendar, even in saved defaults.
+    import datetime
+    window.new_defaults_path.write_text('{"year": 2020, "state": "NY"}', encoding="utf-8")
+    assert window._new_profile_defaults().year == datetime.date.today().year
+    assert builtin.year == datetime.date.today().year
+
+    # A damaged file falls back to the built-in example.
+    window.new_defaults_path.write_text("not json", encoding="utf-8")
+    assert window._new_profile_defaults().to_dict() == builtin.to_dict()
+
+
+def test_help_project_home_opens_browser(window, monkeypatch):
+    from rtpl.app import main_window as mw
+
+    opened = []
+    monkeypatch.setattr(mw.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
+    help_menu = next(a.menu() for a in window.menuBar().actions() if a.text() == "&Help")
+    next(a for a in help_menu.actions() if a.text() == "&Project Home…").trigger()
+    assert opened == [mw.PROJECT_URL]
