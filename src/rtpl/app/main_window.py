@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProxyStyle,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QStyle,
     QStyleOptionMenuItem,
@@ -265,6 +266,53 @@ class ColorDialog(QDialog):
         self._refresh()
 
 
+class NewProfileDefaultsDialog(QDialog):
+    """Edit the profile that File > New starts from.
+
+    It is kept in the app's settings folder, not in any profile or plan
+    file, so a single filer in New York (say) can stop changing the same
+    fields on every new profile.
+    """
+
+    def __init__(self, defaults: Profile, current: Profile, builtin: Profile,
+                 states: list[str], parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("New Profile Defaults")
+        self._current = current
+        self._builtin = builtin
+        outer = QVBoxLayout(self)
+        intro = QLabel("File > New starts from these values. They are kept with the "
+                       "app's settings, not saved in any profile or plan file.")
+        intro.setWordWrap(True)
+        outer.addWidget(intro)
+        self.form = ProfileForm(states)
+        self.form.set_profile(defaults)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.form)
+        outer.addWidget(scroll, 1)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+            | QDialogButtonBox.StandardButton.RestoreDefaults
+        )
+        restore = buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults)
+        restore.setText("&Reset to Built-in")
+        restore.setToolTip("Go back to the example profile the app comes with")
+        restore.clicked.connect(lambda: self.form.set_profile(self._builtin))
+        use_current = buttons.addButton("Copy &Current Profile", QDialogButtonBox.ButtonRole.ActionRole)
+        use_current.setToolTip("Fill the form from the profile that is open now")
+        use_current.clicked.connect(lambda: self.form.set_profile(self._current))
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        outer.addWidget(buttons)
+        self.resize(460, 640)
+
+    def profile(self) -> Profile:
+        return self.form.profile()
+
+
 _RESERVED_NAMES = {"CON", "PRN", "AUX", "NUL", *(f"COM{i}" for i in range(1, 10)), *(f"LPT{i}" for i in range(1, 10))}
 
 
@@ -286,6 +334,7 @@ class MainWindow(QMainWindow):
         self.library = library or TaxLawLibrary(user_dirs=[config_dir() / "taxlaw"])
         self.theme_path = config_dir() / "theme.toml"
         self.theme = Theme.load(self.theme_path)
+        self.new_defaults_path = config_dir() / "new_profile.json"
         self.theme_mode = "system"
         self.effective_mode = "light"
         self.current_path: Path | None = None
@@ -362,10 +411,34 @@ class MainWindow(QMainWindow):
         self.plan_view.columns_changed.connect(self._mark_modified)
         self._sync_input_tabs()
 
-        self._load_profile(self._starter_profile(), None)
+        self._load_profile(self._new_profile_defaults(), None)
         self.statusBar().showMessage("Ready")
 
     # -- building ------------------------------------------------------
+    def _new_profile_defaults(self) -> Profile:
+        """The profile File > New starts from: the user's saved defaults
+        (View > New Profile Defaults), or the built-in example."""
+        if self.new_defaults_path.exists():
+            try:
+                return Profile.load(self.new_defaults_path)
+            except (OSError, ValueError, TypeError) as exc:
+                print(f"Ignoring {self.new_defaults_path}: {exc}")
+        return self._starter_profile()
+
+    def edit_new_profile_defaults(self) -> None:
+        dlg = NewProfileDefaultsDialog(
+            self._new_profile_defaults(), self.form.profile(), self._starter_profile(),
+            self.library.available_states(), self,
+        )
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        profile = dlg.profile()
+        if profile.to_dict() == self._starter_profile().to_dict():
+            self.new_defaults_path.unlink(missing_ok=True)
+        else:
+            profile.save(self.new_defaults_path)
+        self.statusBar().showMessage("File > New will use these defaults")
+
     @staticmethod
     def _starter_profile() -> Profile:
         return Profile(
@@ -616,6 +689,7 @@ class MainWindow(QMainWindow):
         m.addAction(QAction("E&xit", self, shortcut=QKeySequence.StandardKey.Quit, triggered=self.close))
 
         v = self.menuBar().addMenu("&View")
+        v.setToolTipsVisible(True)
         group = QActionGroup(self)
         for text, mode in (("&System theme", "system"), ("&Light mode", "light"), ("&Dark mode", "dark")):
             act = QAction(text, self, checkable=True, checked=mode == "system")
@@ -628,6 +702,10 @@ class MainWindow(QMainWindow):
         v.addAction(QAction("&Reset Window Layout", self, triggered=self.reset_layout))
         v.addSeparator()
         v.addAction(QAction("Chart &Colors…", self, triggered=self.edit_colors))
+        defaults = QAction("New Profile &Defaults…", self, triggered=self.edit_new_profile_defaults)
+        defaults.setToolTip("Choose the values File > New starts from, such as filing status,\n"
+                            "state, inflation and Social Security")
+        v.addAction(defaults)
 
         h = self.menuBar().addMenu("&Help")
         h.addAction(QAction("&About", self, triggered=self.about))
@@ -795,7 +873,7 @@ class MainWindow(QMainWindow):
     def new_profile(self) -> None:
         if self.maybe_save():
             self._set_plan(None)
-            self._load_profile(self._starter_profile(), None)
+            self._load_profile(self._new_profile_defaults(), None)
 
     def open_document(self) -> None:
         """File > Open: a profile or a plan, whichever the file holds."""
