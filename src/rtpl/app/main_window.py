@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import textwrap
+from datetime import date
 from pathlib import Path
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
@@ -287,6 +288,9 @@ class NewProfileDefaultsDialog(QDialog):
         outer.addWidget(intro)
         self.form = ProfileForm(states)
         self.form.set_profile(defaults)
+        # New profiles always start in the current calendar year.
+        self.form.year.setEnabled(False)
+        self.form.year.setToolTip("New profiles always start in the current year")
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.form)
@@ -420,7 +424,9 @@ class MainWindow(QMainWindow):
         (View > New Profile Defaults), or the built-in example."""
         if self.new_defaults_path.exists():
             try:
-                return Profile.load(self.new_defaults_path)
+                profile = Profile.load(self.new_defaults_path)
+                profile.year = date.today().year  # always the current year
+                return profile
             except (OSError, ValueError, TypeError) as exc:
                 print(f"Ignoring {self.new_defaults_path}: {exc}")
         return self._starter_profile()
@@ -433,6 +439,7 @@ class MainWindow(QMainWindow):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         profile = dlg.profile()
+        profile.year = date.today().year
         if profile.to_dict() == self._starter_profile().to_dict():
             self.new_defaults_path.unlink(missing_ok=True)
         else:
@@ -443,7 +450,7 @@ class MainWindow(QMainWindow):
     def _starter_profile() -> Profile:
         return Profile(
             name="Example",
-            year=2026,
+            year=date.today().year,
             filing_status="mfj",
             people=[
                 Person(name="Person 1", birth_year=1959, social_security=30000),

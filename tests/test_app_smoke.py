@@ -519,6 +519,12 @@ def test_new_profile_defaults(window, monkeypatch):
     assert not window.new_defaults_path.exists()
     assert window.form.profile().state == "NY"
 
+    # The tax year follows the calendar, even in saved defaults.
+    import datetime
+    window.new_defaults_path.write_text('{"year": 2020, "state": "NY"}', encoding="utf-8")
+    assert window._new_profile_defaults().year == datetime.date.today().year
+    assert builtin.year == datetime.date.today().year
+
     # A damaged file falls back to the built-in example.
     window.new_defaults_path.write_text("not json", encoding="utf-8")
     assert window._new_profile_defaults().to_dict() == builtin.to_dict()
