@@ -528,3 +528,13 @@ def test_new_profile_defaults(window, monkeypatch):
     # A damaged file falls back to the built-in example.
     window.new_defaults_path.write_text("not json", encoding="utf-8")
     assert window._new_profile_defaults().to_dict() == builtin.to_dict()
+
+
+def test_help_project_home_opens_browser(window, monkeypatch):
+    from rtpl.app import main_window as mw
+
+    opened = []
+    monkeypatch.setattr(mw.QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True)
+    help_menu = next(a.menu() for a in window.menuBar().actions() if a.text() == "&Help")
+    next(a for a in help_menu.actions() if a.text() == "&Project Home…").trigger()
+    assert opened == [mw.PROJECT_URL]

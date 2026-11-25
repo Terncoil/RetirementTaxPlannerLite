@@ -9,8 +9,8 @@ from pathlib import Path
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtCore import QEvent, QSettings, QStandardPaths, Qt, QTimer
-from PySide6.QtGui import QAction, QActionGroup, QColor, QIcon, QPixmap, QGuiApplication, QKeySequence, QPalette
+from PySide6.QtCore import QEvent, QSettings, QStandardPaths, Qt, QTimer, QUrl
+from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QIcon, QPixmap, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -73,6 +73,9 @@ ANNOTATION_LABELS = {
     "aca": "ACA subsidy cliffs",
     "state_cliff": "State tax cliffs",
 }
+
+
+PROJECT_URL = "https://github.com/Terncoil/RetirementTaxPlannerLite"
 
 
 def config_dir() -> Path:
@@ -715,6 +718,11 @@ class MainWindow(QMainWindow):
         v.addAction(defaults)
 
         h = self.menuBar().addMenu("&Help")
+        h.setToolTipsVisible(True)
+        home = QAction("&Project Home…", self, triggered=self.open_project_home)
+        home.setToolTip("Open the project's GitHub page in your web browser")
+        h.addAction(home)
+        h.addSeparator()
         h.addAction(QAction("&About", self, triggered=self.about))
 
     # -- behaviour -----------------------------------------------------
@@ -1091,6 +1099,10 @@ class MainWindow(QMainWindow):
             charts.append(ReportChart("Taxes by source", lambda fig: render_taxes(fig, result, palette, **kw)))
             charts.append(ReportChart("Balances", lambda fig: render_balances(fig, result, palette, **kw)))
         return title, sections, charts
+
+    def open_project_home(self) -> None:
+        if not QDesktopServices.openUrl(QUrl(PROJECT_URL)):
+            QMessageBox.information(self, APP_NAME, f"Couldn't open a web browser. The project is at\n{PROJECT_URL}")
 
     def about(self) -> None:
         years = ", ".join(str(y) for y in self.library.enacted_years)
