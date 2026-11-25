@@ -412,6 +412,11 @@ class RetirementExclusion:
     # A cap for the whole return by filing status instead of ``amount`` per
     # person (New Jersey's pension exclusion).
     per_return: dict[str, float] | None = None
+    # What a phase-out that keeps less than all takes its share of: "cap",
+    # the capped amount (the default), or "income", all the eligible
+    # income with no cap (New Jersey: 37.5% of all pension income from
+    # $100K to $125K, where the $75,000 cap no longer applies).
+    phased_share_of: str = "cap"
     # Birth years that qualify: ``born_from`` <= birth year < ``born_before``.
     born_from: int | None = None
     born_before: int | None = None
@@ -550,6 +555,7 @@ def _parse_state(raw: dict) -> StateLaw:
                 born_before=ex.get("born_before"),
                 birth_year_of=_choice(ex, "birth_year_of", ("self", "older_spouse")),
                 group=ex.get("group"),
+                phased_share_of=_choice(ex, "phased_share_of", ("cap", "income")),
             )
         )
         bad = set(exclusions[-1].applies_to) - {"pension", "ira", "any"}

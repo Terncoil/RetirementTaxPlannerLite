@@ -6,7 +6,7 @@ import pytest
 
 from rtpl.engine.marginal import build_marginal_series
 from rtpl.engine.tax import compute_tax
-from rtpl.model.profile import Person, Profile
+from rtpl.model.profile import Household, Person, Profile
 from rtpl.taxlaw.loader import Phaseout, _parse_phaseout
 
 from conftest import make
@@ -159,7 +159,7 @@ def test_new_jersey_style_per_return_cap_is_shared(lib):
                                            Person(birth_year=1955, pension=40_000)])
     none = dataclasses.replace(nj, retirement_exclusions=())
     diff = compute_tax(p, law, none).state_tax - compute_tax(p, law, capped).state_tax
-    assert diff == pytest.approx(none.brackets["mfj"].tax(80_000 - 2_000) - none.brackets["mfj"].tax(30_000 - 2_000))
+    assert diff == pytest.approx(none.brackets["mfj"].tax(80_000 - 4_000) - none.brackets["mfj"].tax(30_000 - 4_000))  # 2 exemptions + 2 senior 65+
 
 
 def test_state_cliff_is_a_marker_not_a_spike(lib):
@@ -214,3 +214,40 @@ def test_approximated_states_add_a_chart_footnote(lib):
     vis = default_visibility(s)
     assert "MN: Social Security subtraction phase-out smoothed" in footnotes(vis)
     assert "MN:" not in footnotes({**vis, "state": False})
+
+
+def _nj_single_retiree(ira: float = 35_000) -> Profile:
+    return Profile(
+        year=2024, filing_status="single", state="NJ",
+        people=[Person(birth_year=1949, social_security=34_000, ira_distributions=ira)],
+        household=Household(taxable_interest=3_500, qualified_dividends=7_500, long_term_capital_gains=10_500),
+    )
+
+
+def test_new_jersey_upper_tiers_take_a_share_of_all_pension_income(lib):
+    # $100K-$125K single: 37.5% of all pension/IRA income is excluded, with
+    # no $75,000 cap; $125K-$150K: 18.75%.
+    law = lib.federal(2024)
+    nj = lib.state("NJ", 2024)
+    sched = nj.brackets["single"]
+    other = 3_500 + 7_500 + 10_500
+    for ira, share in ((85_000, 0.375), (110_000, 0.1875)):
+        r = compute_tax(_nj_single_retiree(ira), law, nj)
+        taxable = ira + other - share * ira - 1_000 - 1_000  # exemption + senior 65+
+        assert r.state_tax == pytest.approx(sched.tax(taxable), abs=0.01)
+    # So the marginal rate in the $100K-$125K tier is 62.5% of the bracket rate.
+    s = build_marginal_series(_nj_single_retiree(), lib, x_max=60_000, step=100)
+    assert s.layers["state"][int(55_000 // 100)] == pytest.approx(0.625 * 0.0637, abs=1e-6)
+    cliffs = [a for a in s.annotations if a.kind == "state_cliff"]
+    assert [round(a.x, -2) for a in cliffs] == [43_500]
+
+
+def test_new_jersey_senior_exemption(lib):
+    law = lib.federal(2024)
+    nj = lib.state("NJ", 2024)
+    old = compute_tax(_nj_single_retiree(), law, nj).state_tax
+    young = Profile.from_dict({**_nj_single_retiree().to_dict(), "people": [
+        {**_nj_single_retiree().to_dict()["people"][0], "birth_year": 1961}]})
+    # Born 1961: 63, so the pension exclusion (62+) applies but not the senior exemption.
+    sched = nj.brackets["single"]
+    assert compute_tax(young, law, nj).state_tax - old == pytest.approx(sched.tax(20_500) - sched.tax(19_500), abs=0.01)

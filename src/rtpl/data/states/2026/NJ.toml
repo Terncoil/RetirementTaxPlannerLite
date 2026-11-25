@@ -13,8 +13,9 @@ taxes_social_security = false
 # No deduction for HSA contributions: the state adds them back to income.
 taxes_hsa_contributions = true
 notes = [
-  "Pension/IRA exclusion at 62+: up to $100,000 joint / $75,000 single with total income to $100K, then a share of it to $150K, then none (cliffs). Total income is taken as AGI less taxable Social Security.",
-  "Other retirement income exclusion and extra $1,000 exemption at 65+ not modelled.",
+  "Pension/IRA exclusion at 62+: up to $100,000 joint / $75,000 single with total income to $100K, then 37.5%/50% and 18.75%/25% (single/joint) of all pension/IRA income, uncapped, to $150K, then none (cliffs). Total income is taken as AGI less taxable Social Security.",
+  "Extra $1,000 exemption at 65+ (each spouse on a joint return).",
+  "Other retirement income exclusion (unused pension exclusion applied to other income) not modelled.",
 ]
 
 [brackets]
@@ -28,9 +29,16 @@ mfj    = 0
 [exemption]
 per_person = 1000
 
+# Senior exemption: $1,000 more for each person 65 or older.
+[age_deduction]
+amount = 1000
+min_age = 65
+
 [[retirement_exclusions]]
 min_age = 62
 per_return = { single = 75000, mfj = 100000, mfs = 50000, hoh = 75000 }
+# Above $100K the exclusion is a share of all pension/IRA income, uncapped.
+phased_share_of = "income"
 [retirement_exclusions.phaseout]
 income = "agi_ex_ss"
 tiers = [

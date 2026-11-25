@@ -120,7 +120,12 @@ def _excluded(profile: Profile, state: StateLaw, exclusions, extra_ira: float, i
                 return_left[id(ex)] -= used
             # Count only the part a phase-out leaves, but use up the
             # eligible buckets in order as if the whole exclusion applied.
-            total += _phased(used, ex.phaseout, incomes, fs)
+            if ex.phased_share_of == "income" and _phased(1.0, ex.phaseout, incomes, fs) < 1.0:
+                # Above the full tier the share is of all eligible income
+                # and the cap no longer applies.
+                total += _phased(eligible, ex.phaseout, incomes, fs)
+            else:
+                total += _phased(used, ex.phaseout, incomes, fs)
             for k in ex.applies_to:
                 if k in remaining and used > 0:
                     take = min(remaining[k], used)
