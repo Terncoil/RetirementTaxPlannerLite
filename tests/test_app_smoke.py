@@ -589,3 +589,86 @@ def test_help_project_home_opens_browser(window, monkeypatch):
     help_menu = next(a.menu() for a in window.menuBar().actions() if a.text() == "&Help")
     next(a for a in help_menu.actions() if a.text() == "&Project Home…").trigger()
     assert opened == [mw.PROJECT_URL]
+
+
+def test_save_as_offers_rtpl_and_opens_it(window, tmp_path, monkeypatch):
+    """Save As names the file .rtpl (even when the old file was .json), and
+    the saved file opens again, as a double-click passes it to the app."""
+    import shutil
+
+    from rtpl.app import main_window as mw
+
+    old = tmp_path / "couple.json"
+    shutil.copy("examples/profiles/retired_couple_ca.json", old)
+    window.open_file(old)
+    offered = {}
+
+    def fake_save(parent, caption, start, filters):
+        offered["start"], offered["filters"] = start, filters
+        return str(tmp_path / "couple"), ""  # no extension typed
+
+    monkeypatch.setattr(mw.QFileDialog, "getSaveFileName", fake_save)
+    assert window.save_as()
+    assert offered["start"] == str(tmp_path / "couple.rtpl")
+    assert offered["filters"].startswith("RetirementTaxPlannerLite files (*.rtpl)")
+    saved = tmp_path / "couple.rtpl"
+    assert window.current_path == saved and saved.exists()
+    assert window.windowTitle().startswith("couple.rtpl[*]")
+
+    window.new_profile()
+    from rtpl.app.__main__ import DocumentRouter
+
+    DocumentRouter(window).open(saved, ask=False)
+    assert window.current_path == saved
+    assert window.form.profile().state == "CA"
+
+
+def test_eqta_file_waits_for_its_window(window, monkeypatch):
+    from rtpl.app import __main__ as entry
+
+    shown = []
+    monkeypatch.setattr(QtWidgets.QMessageBox, "information", lambda *a: shown.append(a[2]))
+    opened = []
+    monkeypatch.setattr(window, "open_file", opened.append)
+    router = entry.DocumentRouter(window)
+    router.open(Path("2026.eqta"))
+    assert opened == [] and "later version" in shown[0]
+    router.open(Path("plan.rtpl"), ask=False)
+    assert opened == [Path("plan.rtpl")]
+
+
+def test_macos_file_open_event_reaches_the_window(window, monkeypatch):
+    """Finder sends a file-open event to the running app instead of argv."""
+    from PySide6.QtGui import QFileOpenEvent
+
+    from rtpl.app.__main__ import DocumentRouter, application_class
+
+    cls = application_class()
+    opened = []
+    monkeypatch.setattr(window, "open_from_os", opened.append)
+    # The running QApplication is the test's own, so call the handler directly.
+    fake = type("App", (), {"router": DocumentRouter(window), "pending": []})()
+    cls.event(fake, QFileOpenEvent("/tmp/x.rtpl"))
+    assert opened == [Path("/tmp/x.rtpl")]
+
+
+def test_file_types_item_is_checked_from_the_os(window, monkeypatch):
+    """View > Open .rtpl Files With This App shows and changes the OS state."""
+    from rtpl.app import main_window as mw
+
+    action = window.file_types_action
+    assert action is not None and action.isCheckable()  # Linux and Windows
+    state = {"on": False}
+    monkeypatch.setattr(mw, "file_types_registered", lambda: state["on"])
+    monkeypatch.setattr(mw, "register_file_types", lambda: state.update(on=True))
+    monkeypatch.setattr(mw, "unregister_file_types", lambda: state.update(on=False))
+    window.refresh_file_types_action()
+    assert not action.isChecked()
+    action.trigger()
+    assert state["on"] and action.isChecked()
+    state["on"] = False  # changed outside the app: re-read when the menu opens
+    window.refresh_file_types_action()
+    assert not action.isChecked()
+    action.trigger()
+    action.trigger()
+    assert not state["on"] and not action.isChecked()

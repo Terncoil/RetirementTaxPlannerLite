@@ -2,8 +2,9 @@
 Type=Application
 Name=RetirementTaxPlannerLite
 Comment=Marginal and forward-looking tax graphs
-Exec=RetirementTaxPlannerLite
+Exec=RetirementTaxPlannerLite %f
 Icon=rtpl
 Terminal=false
 Categories=Office;Finance;
+MimeType=application/x-rtpl;
 StartupWMClass=rtpl

@@ -98,8 +98,18 @@ totals update as you type. One profile, and at most one plan, is open at
 a time. **File > Open** opens either kind of file. **File > Save** and
 **Save As** save the plan when one is open (a plan file holds its profile
 too), otherwise the profile; **Save Profile As** saves just the profile.
-New, Open, New Plan from Profile and Exit ask first about unsaved changes. From the
-command line:
+New, Open, New Plan from Profile and Exit ask first about unsaved changes.
+
+Profiles and plans are saved as `.rtpl` files. Files saved as `.json` by
+earlier versions still open, and their first **Save As** offers the
+`.rtpl` name. Double-clicking a `.rtpl` file opens it in the app once the
+file type is registered: the macOS app does that itself,
+`sh packaging/linux/install.sh` does it for a Linux build, and on Windows
+(or when running from source) use **View > Open .rtpl Files With This App** (a checked item that shows whether this copy opens `.rtpl` files; untick to undo)
+or `uv run rtpl-shortcut`. The app also opens a file named on its command
+line, such as `uv run rtpl "Smith plan.rtpl"`.
+
+From the command line:
 
 ```bash
 rtpl-plan plan.json -o income.png --balances balances.png --taxes taxes.png --csv years.csv

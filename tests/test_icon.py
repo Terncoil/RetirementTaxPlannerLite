@@ -15,7 +15,8 @@ def test_icon_files_ship():
 
 def test_desktop_entry_quotes_paths():
     text = shortcut.desktop_entry("/home/me/my venv/bin/rtpl", [], "/x/rtpl_256.png")
-    assert 'Exec="/home/me/my venv/bin/rtpl"\n' in text
+    assert 'Exec="/home/me/my venv/bin/rtpl" %f\n' in text
+    assert "MimeType=application/x-rtpl;\n" in text
     assert "Icon=/x/rtpl_256.png\n" in text
     assert f"StartupWMClass={icon.DESKTOP_FILE_NAME}\n" in text
 
@@ -29,9 +30,14 @@ def test_windows_script_escapes_quotes(tmp_path):
 def test_linux_shortcut(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
     monkeypatch.setenv("HOME", str(tmp_path))
+    ran = []
+    monkeypatch.setattr(shortcut, "_run_if_present", lambda *cmd: ran.append(cmd))
     made = shortcut.make_linux()
     entry = (tmp_path / "share" / "applications" / "rtpl.desktop").read_text()
     assert made and "Icon=" in entry and "Exec=" in entry
+    mime = tmp_path / "share" / "mime" / "packages" / "rtpl.xml"
+    assert '<glob pattern="*.rtpl"/>' in mime.read_text()
+    assert ("xdg-mime", "default", "rtpl.desktop", "application/x-rtpl") in ran
 
 
 def test_qt_icon_and_about_pixmap():
