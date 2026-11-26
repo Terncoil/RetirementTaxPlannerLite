@@ -200,7 +200,10 @@ year the state taxes any income has an `[estimated_payments]` table
   the period's end and otherwise in the next year. California's shares are
   30/40/0/30 with no September date; Delaware's first installment is due
   April 30, Virginia's May 1, Hawaii's on the 20th and Iowa's on the last
-  day of the month.
+  day of the month. An installment's `period_end` replaces the usual end
+  of its period: Virginia's first period runs to April 30 (Form 760C,
+  23VAC10-112-43), so income through April 30 counts toward May 1. Every
+  other state uses the usual period ends, later due dates included.
 * `annual_only`: one payment with the return (Washington).
 * `holidays`: the days a due date moves past, besides weekends. The
   default, `federal`, is the District of Columbia's legal holidays that
@@ -211,10 +214,10 @@ year the state taxes any income has an `[estimated_payments]` table
   postponement (2020's COVID-19 relief, Washington's May 1, 2026). A later
   year that falls back to the file uses the `due` rule again, and the
   projected federal years drop it.
-* `notes`: annotations for EQTA, such as who must pay and Virginia's first
-  period (not modelled yet, #53).
+* `notes`: annotations for EQTA, such as who must pay.
 
-`due_dates(year)` gives each installment's date (None when nothing is
+`period_ends(year)` gives the last day of income each installment
+covers, `due_dates(year)` each installment's date (None when nothing is
 due), `differs_from(federal, year)` which ones differ from the federal
 date for the same period, and `annualized_percentages()` the annualized
 method's cumulative percentages (California 27/63/63/90, federal

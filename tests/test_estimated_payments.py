@@ -112,9 +112,17 @@ def test_states_without_required_estimates(lib):
     assert lib.state("FL", 2026).estimated_payments is None
 
 
-def test_virginia_first_period_has_a_note(lib):
-    notes = " ".join(lib.state("VA", 2026).estimated_payments.notes)
-    assert "first period" in notes
+def test_virginia_first_period_runs_to_april_30(lib):
+    va = lib.state("VA", 2026).estimated_payments
+    assert va.period_ends(2026) == (date(2026, 4, 30), date(2026, 5, 31), date(2026, 8, 31), date(2026, 12, 31))
+    assert va.differs_from(fed(lib, 2026), 2026) == (True, False, False, False)
+    assert va.annualized_percentages() == (0.225, 0.45, 0.675, 0.90)
+    # Every other state counts income through the usual period ends.
+    usual = fed(lib, 2026).period_ends(2026)
+    for code in lib.available_states():
+        sched = lib.state(code, 2026).estimated_payments
+        if code != "VA" and sched is not None and len(sched.installments) == 4:
+            assert sched.period_ends(2026) == usual, code
 
 
 @pytest.mark.parametrize("raw, message", [
@@ -124,6 +132,8 @@ def test_virginia_first_period_has_a_note(lib):
     ({"installments": [{"share": 1.0}]}, "needs a due date"),
     ({"holidays": ["arbor"], "installments": []}, "Unknown holiday"),
     ({"annual_only": True, "installments": []}, "exactly one"),
+    ({"installments": [{"due": "07-15", "period_end": "06-30", "share": 0.25}] * 4}, "in order"),
+    ({"installments": [{"due": "04-15", "period_end": "4/30", "share": 1.0}]}, "period_end must be"),
 ])
 def test_bad_schedules_are_refused(raw, message):
     with pytest.raises(ValueError, match=message):

@@ -24,8 +24,9 @@ date the state published that the rule doesn't give. A later year that
 uses the same file goes back to ``due``.
 
 Four installments cover the periods ending March 31, May 31, August 31
-and December 31, the same everywhere. One installment covers the whole
-year.
+and December 31, and one covers the whole year. An installment's
+``period_end`` ("MM-DD") replaces that: Virginia's first period runs to
+April 30 (Form 760C), so income through April 30 counts toward May 1.
 """
 
 from __future__ import annotations
@@ -157,6 +158,7 @@ class Installment:
     share: float  # of the year's required annual payment
     due: tuple[int, int] | None = None  # (month, day); None = nothing due
     due_date: dt.date | None = None  # exact date, for the file's own year only
+    period_end: tuple[int, int] | None = None  # (month, day) when not the usual one
 
 
 @dataclass(frozen=True)
@@ -172,9 +174,11 @@ class EstimatedPayments:
 
     def period_ends(self, tax_year: int) -> tuple[dt.date, ...]:
         """The last day of the income period each installment covers."""
-        if len(self.installments) == 1:
-            return (dt.date(tax_year, 12, 31),)
-        return tuple(dt.date(tax_year, m, d) for m, d in PERIOD_ENDS[: len(self.installments)])
+        usual = ((12, 31),) if len(self.installments) == 1 else PERIOD_ENDS
+        return tuple(
+            dt.date(tax_year, *(inst.period_end or default))
+            for inst, default in zip(self.installments, usual)
+        )
 
     def due_dates(self, tax_year: int) -> tuple[dt.date | None, ...]:
         """Each installment's due date for ``tax_year`` (None when nothing is due)."""
@@ -225,12 +229,12 @@ class EstimatedPayments:
         )
 
 
-def _parse_due(value) -> tuple[int, int]:
+def _parse_due(value, key: str = "due") -> tuple[int, int]:
     try:
         month, day = (int(p) for p in str(value).split("-"))
         dt.date(2000, month, day)  # validates (2000 is a leap year)
     except (ValueError, TypeError):
-        raise ValueError(f"estimated_payments due must be \"MM-DD\", not {value!r}") from None
+        raise ValueError(f"estimated_payments {key} must be \"MM-DD\", not {value!r}") from None
     return month, day
 
 
@@ -247,6 +251,7 @@ def parse_estimated_payments(raw: dict | None, year: int | None) -> EstimatedPay
                 share=float(item.get("share", 0.0)),
                 due=_parse_due(item["due"]) if "due" in item else None,
                 due_date=due_date,
+                period_end=_parse_due(item["period_end"], "period_end") if "period_end" in item else None,
             )
         )
     if len(insts) not in (0, 1, 4):
@@ -256,6 +261,9 @@ def parse_estimated_payments(raw: dict | None, year: int | None) -> EstimatedPay
     for i in insts:
         if i.share > 0 and i.due is None and i.due_date is None:
             raise ValueError("an installment with a share needs a due date")
+    ends = [i.period_end or PERIOD_ENDS[n] for n, i in enumerate(insts)] if len(insts) == 4 else []
+    if any(a >= b for a, b in zip(ends, ends[1:])):
+        raise ValueError("estimated_payments period ends must be in order")
     annual_only = bool(raw.get("annual_only", False))
     if annual_only and len(insts) != 1:
         raise ValueError("annual_only estimated_payments has exactly one installment")

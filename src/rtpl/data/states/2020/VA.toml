@@ -32,15 +32,16 @@ amount = 12000
 min_age = 65
 phaseout = { start = { single = 50000, mfj = 75000, mfs = 75000 }, rate = 1, income = "agi_ex_ss" }
 
-# Form 760ES: the first installment is due May 1.
+# Form 760ES: the first installment is due May 1 and covers income through
+# April 30 (Form 760C annualizes January 1 to April 30; 23VAC10-112-43).
 [estimated_payments]
 notes = [
   "Virginia's first installment is due May 1, later than the federal April 15.",
-  "Virginia's rules for the first period differ from the federal ones and are not modelled yet; check Form 760ES for the first payment.",
+  "Virginia's first period runs from January 1 to April 30, a month longer than the federal one, so income through April 30 counts toward the May 1 payment.",
   "2020: COVID-19 relief moved the first installment to June 1, 2020 (Tax Foundation table as of May 19, 2020).",
 ]
 installments = [
-  { due = "05-01", share = 0.25, due_date = 2020-06-01 },
+  { due = "05-01", period_end = "04-30", share = 0.25, due_date = 2020-06-01 },
   { due = "06-15", share = 0.25 },
   { due = "09-15", share = 0.25 },
   { due = "01-15", share = 0.25 },
