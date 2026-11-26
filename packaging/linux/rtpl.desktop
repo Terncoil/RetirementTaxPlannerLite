@@ -6,5 +6,5 @@ Exec=RetirementTaxPlannerLite %f
 Icon=rtpl
 Terminal=false
 Categories=Office;Finance;
-MimeType=application/x-rtpl;
+MimeType=application/x-rtpl;application/x-eqta;
 StartupWMClass=rtpl

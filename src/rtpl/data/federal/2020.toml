@@ -137,3 +137,16 @@ installments = [
   { due = "09-15", share = 0.25 },
   { due = "01-15", share = 0.25 },
 ]
+
+# Safe harbors against the underpayment penalty (IRC 6654(d), Form 2210),
+# fixed in statute. The required annual payment is the smaller of
+# current_year_share of this year's tax and prior_year_share of last year's
+# (high_income_prior_year_share when last year's AGI was over
+# high_income_agi). No penalty when the tax not covered by withholding is
+# under penalty_floor (IRC 6654(e)(1)).
+[estimated_payments.safe_harbor]
+current_year_share = 0.90
+prior_year_share = 1.00
+high_income_prior_year_share = 1.10
+high_income_agi = { single = 150000, mfj = 150000, mfs = 75000, hoh = 150000 }
+penalty_floor = 1000

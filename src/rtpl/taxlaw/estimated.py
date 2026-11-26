@@ -162,6 +162,22 @@ class Installment:
 
 
 @dataclass(frozen=True)
+class SafeHarbor:
+    """Federal safe harbors against the underpayment penalty (Form 2210)."""
+
+    current_year_share: float  # of this year's tax (90%)
+    prior_year_share: float  # of last year's tax (100%)
+    high_income_prior_year_share: float  # when last year's AGI was over the limit (110%)
+    high_income_agi: dict[str, float]  # by filing status key
+    penalty_floor: float = 0.0  # no penalty when the balance after withholding is under this
+
+    def prior_share(self, prior_agi: float | None, fs: str) -> float:
+        if prior_agi is not None and prior_agi > self.high_income_agi.get(fs, float("inf")):
+            return self.high_income_prior_year_share
+        return self.prior_year_share
+
+
+@dataclass(frozen=True)
 class EstimatedPayments:
     """When estimated tax is due and how much of it by each date."""
 
@@ -171,6 +187,7 @@ class EstimatedPayments:
     annual_only: bool = False
     holidays: tuple[str, ...] = FEDERAL_HOLIDAYS
     notes: tuple[str, ...] = ()
+    safe_harbor: SafeHarbor | None = None
 
     def period_ends(self, tax_year: int) -> tuple[dt.date, ...]:
         """The last day of the income period each installment covers."""
@@ -267,8 +284,19 @@ def parse_estimated_payments(raw: dict | None, year: int | None) -> EstimatedPay
     annual_only = bool(raw.get("annual_only", False))
     if annual_only and len(insts) != 1:
         raise ValueError("annual_only estimated_payments has exactly one installment")
+    sh = raw.get("safe_harbor")
+    safe_harbor = None
+    if sh is not None:
+        safe_harbor = SafeHarbor(
+            current_year_share=float(sh["current_year_share"]),
+            prior_year_share=float(sh["prior_year_share"]),
+            high_income_prior_year_share=float(sh["high_income_prior_year_share"]),
+            high_income_agi={k: float(v) for k, v in sh["high_income_agi"].items()},
+            penalty_floor=float(sh.get("penalty_floor", 0.0)),
+        )
     return EstimatedPayments(
         year=year,
+        safe_harbor=safe_harbor,
         required=bool(raw.get("required", True)),
         installments=tuple(insts),
         annual_only=annual_only,
@@ -278,6 +306,6 @@ def parse_estimated_payments(raw: dict | None, year: int | None) -> EstimatedPay
 
 
 __all__ = [
-    "EstimatedPayments", "Installment", "parse_estimated_payments", "next_business_day",
+    "EstimatedPayments", "Installment", "SafeHarbor", "parse_estimated_payments", "next_business_day",
     "PERIOD_ENDS", "HOLIDAY_NAMES", "FEDERAL_HOLIDAYS",
 ]

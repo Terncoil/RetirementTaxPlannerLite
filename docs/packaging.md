@@ -50,20 +50,20 @@ uv run --with pyinstaller pyinstaller packaging/rtpl.spec --noconfirm
 ## File types
 
 Profiles and plans are saved as `.rtpl` files (JSON inside); older `.json`
-files still open. `src/rtpl/app/documents.py` lists the types the OS should
-open with the app (`DOCUMENT_TYPES`) and which window opens each extension.
-The Estimated Quarterly Tax Assistant's `.eqta` files are routed already
-but show a "later version" message until its window exists; add an entry
-to `DOCUMENT_TYPES` then to register them too.
+files still open. The Estimated Quarterly Tax Assistant saves `.eqta` files
+(JSON too), which open in its own window. `src/rtpl/app/documents.py` lists
+the types the OS should open with the app (`DOCUMENT_TYPES`) and which
+window opens each extension; `src/rtpl/app/windows.py` sends each file to
+its window.
 
 A double-clicked file reaches the app as a command-line argument on Windows
 and Linux, and as a file-open event on macOS. Registration:
 
-| OS | How `.rtpl` gets registered |
+| OS | How `.rtpl` and `.eqta` get registered |
 | --- | --- |
-| Windows | **View > Open .rtpl Files With This App** (a checked item that shows whether this copy opens `.rtpl` files; untick to undo), or `uv run rtpl-shortcut` from source. Both write per-user keys under `HKCU\Software\Classes` (no administrator rights) pointing at the copy of the app they run from; do it again after moving the app. A future installer can write the same keys. |
+| Windows | **View > Open .rtpl and .eqta Files With This App** (a checked item that shows whether this copy opens both file types; untick to undo), or `uv run rtpl-shortcut` from source. Both write per-user keys under `HKCU\Software\Classes` (no administrator rights) pointing at the copy of the app they run from; do it again after moving the app. A future installer can write the same keys. |
 | macOS | `packaging/rtpl.spec` adds `CFBundleDocumentTypes` and `UTExportedTypeDeclarations` to the bundle's Info.plist; Finder picks them up when the app is in Applications. |
-| Linux | `packaging/linux/install.sh` installs `packaging/linux/rtpl-mime.xml` (MIME type `application/x-rtpl`), the `.desktop` file with its `MimeType` line and `%f`, and makes the app the default with `xdg-mime`. From source, `uv run rtpl-shortcut` or the Help menu item does the same. |
+| Linux | `packaging/linux/install.sh` installs `packaging/linux/rtpl-mime.xml` (MIME types `application/x-rtpl` and `application/x-eqta`), the `.desktop` file with its `MimeType` line and `%f`, and makes the app the default with `xdg-mime`. From source, `uv run rtpl-shortcut` or the Help menu item does the same. |
 
 The tests check that the Linux files match `documents.py`.
 

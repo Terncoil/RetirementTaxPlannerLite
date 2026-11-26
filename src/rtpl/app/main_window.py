@@ -50,7 +50,9 @@ from rtpl.app.documents import (
     OPEN_FILTER,
     RTPL_SUFFIX,
     SAVE_FILTER,
+    WINDOW_EQTA,
     save_as_start,
+    window_for,
     with_rtpl_suffix,
 )
 from rtpl.app.icon import about_pixmap
@@ -359,6 +361,7 @@ class MainWindow(QMainWindow):
         self.theme_mode = "system"
         self.effective_mode = "light"
         self.current_path: Path | None = None
+        self.windows = None  # the app's window manager (rtpl.app.windows), when there is one
         self.series: MarginalSeries | None = None
         self.overrides: dict[str, bool] = {}  # user's explicit layer choices
 
@@ -735,14 +738,15 @@ class MainWindow(QMainWindow):
         defaults.setToolTip("Choose the values File > New starts from, such as filing status,\n"
                             "state, inflation and Social Security")
         v.addAction(defaults)
-        # Ticked while the OS opens .rtpl files with this copy of the app; it
+        # Ticked while the OS opens .rtpl and .eqta files with this copy of the app; it
         # reads the OS each time the menu opens. macOS: the bundle does it.
         self.file_types_action = None
         if can_register_file_types():
             v.addSeparator()
-            self.file_types_action = QAction("Open .rtpl Files With &This App", self, checkable=True)
+            self.file_types_action = QAction("Open .rtpl and .eqta Files With &This App", self, checkable=True)
             self.file_types_action.setToolTip(
-                "Ticked: double-clicking a .rtpl file opens it in this copy of the app.\n"
+                "Ticked: double-clicking a .rtpl or .eqta file opens it in this copy\n"
+                "of the app.\n"
                 "Untick to stop. If you move the app to another folder, the tick\n"
                 "clears; tick it again")
             self.file_types_action.toggled.connect(self._file_types_toggled)
@@ -925,10 +929,8 @@ class MainWindow(QMainWindow):
 
     def open_document(self) -> None:
         """File > Open: a profile or a plan, whichever the file holds."""
-        if not self.maybe_save():
-            return
         path, _ = QFileDialog.getOpenFileName(self, "Open", "", OPEN_FILTER)
-        if path:
+        if path and (window_for(Path(path)) == WINDOW_EQTA or self.maybe_save()):
             self.open_file(Path(path))
 
     def open_from_os(self, path: Path) -> None:
@@ -957,7 +959,7 @@ class MainWindow(QMainWindow):
             else:
                 unregister_file_types()
         except (OSError, RuntimeError) as exc:
-            QMessageBox.warning(self, APP_NAME, f"Could not change the .rtpl file type:\n{exc}")
+            QMessageBox.warning(self, APP_NAME, f"Could not change the .rtpl and .eqta file types:\n{exc}")
         self.refresh_file_types_action()
         if checked and not self.file_types_action.isChecked() and sys.platform == "win32":
             QMessageBox.information(
@@ -968,6 +970,12 @@ class MainWindow(QMainWindow):
 
     def open_file(self, path: Path) -> None:
         """Open a profile or a plan; a plan file is recognized by its "profile" section."""
+        if window_for(path) == WINDOW_EQTA:
+            if self.windows is not None:
+                self.windows.open(path)  # the EQTA window opens it
+            else:
+                QMessageBox.warning(self, "Open", f"{path.name} is an estimated tax file; open it from the EQTA window.")
+            return
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict) and "profile" in data:

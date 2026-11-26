@@ -1,9 +1,10 @@
 """Make a desktop and Start-menu shortcut, with the app icon, for the app
 as installed in this Python environment: ``uv run rtpl-shortcut``.
 
-It also registers the ``.rtpl`` file type, so double-clicking a file opens
-it in the app (see ``rtpl.app.documents``). View > Open .rtpl Files With
-This App does only that, for the downloaded Windows build too.
+It also registers the ``.rtpl`` and ``.eqta`` file types, so double-clicking
+a file opens it in the app (see ``rtpl.app.documents``). View > Open .rtpl
+and .eqta Files With This App does only that, for the downloaded Windows
+build too.
 
 Packaged builds get their shortcuts from the installer instead (see
 ``docs/packaging.md``).

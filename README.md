@@ -105,7 +105,7 @@ earlier versions still open, and their first **Save As** offers the
 `.rtpl` name. Double-clicking a `.rtpl` file opens it in the app once the
 file type is registered: the macOS app does that itself,
 `sh packaging/linux/install.sh` does it for a Linux build, and on Windows
-(or when running from source) use **View > Open .rtpl Files With This App** (a checked item that shows whether this copy opens `.rtpl` files; untick to undo)
+(or when running from source) use **View > Open .rtpl and .eqta Files With This App** (a checked item that shows whether this copy opens both file types; untick to undo)
 or `uv run rtpl-shortcut`. The app also opens a file named on its command
 line, such as `uv run rtpl "Smith plan.rtpl"`.
 
@@ -118,6 +118,34 @@ rtpl-plan plan.json -o income.svg --detail --todays-dollars --line bracket:0.32
 
 See "Forward-looking plan" in [docs/design.md](docs/design.md) for every
 field, the yearly steps and the simplifications.
+
+## Estimated Quarterly Tax Assistant (beta)
+
+**Window > EQTA** (Ctrl+Alt+2) opens a second window for paying federal
+and state income tax as you go during the year; **Window > RTPL**
+(Ctrl+Alt+1) comes back. Each window has its own File menu and asks about
+its own unsaved changes, and the app ends when the last window closes. An
+`.eqta` file holds any number of tax years, one tab each ("2026 · Actuals"),
+made with the **Year** menu (New, Clone with every amount zeroed,
+Rename/Describe, Delete).
+
+In the Inputs panel, the year's **Profile** (filing status, state, people,
+and last year's tax and AGI for the safe harbor), **Notes**, the four
+**Payments** lines (federal withholding and EFTPS, the state's withholding
+and estimated payments) and the income sources, grouped by tax type. Each
+source and payment line has an optional annual plan amount, notes and a
+register of dates and amounts; amounts take simple arithmetic such as
+`3662.90*12`.
+
+The **Worksheet** totals each source through March 31, May 31, August 31
+and December 31, plus the Plan column, and shows the estimated tax on that
+income as if the year ended then, what was paid by each due date and what
+is owed. The state lines follow the state's own schedule (Virginia's first
+period runs to April 30; California's installments are 30/40/0/30).
+Dimmed guidance lines show the annualized method (Form 2210 Schedule AI)
+and the regular safe-harbor installments. **Calculation detail** shows the
+steps behind each column. See "Estimated Quarterly Tax Assistant" in
+[docs/design.md](docs/design.md).
 
 ## Tax law files
 
