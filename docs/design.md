@@ -100,7 +100,9 @@ credits), a Social Security rule (exempt, taxed, exempt from an age, or
 exempt below an AGI limit with an optional phase-out), per-person
 pension/IRA exclusions with minimum ages and qualifying birth years, an
 age-based deduction, capital
-gains exclusions or rate caps, a gains-only tax (Washington), and
+gains exclusions or rate caps, a gains-only tax (Washington), a tax on
+interest and dividends only (`[investment_income_tax]`: New Hampshire to
+2024, Tennessee's Hall tax in 2020), and
 nonrefundable `[[credits]]` (a flat amount, an amount per person, a share
 of the federal deduction, or a share of the Social Security the state
 taxes; of credits in the same `group` only the largest counts). hoh and
@@ -168,6 +170,23 @@ Vermont, West Virginia, Utah's credit), retirement exclusions
 Washington's capital gains tax from 2022. Each file's `notes` say what is
 approximate.
 
+States with no tax on wages are listed in `states/_no_income_tax.toml`.
+One that taxed interest and dividends in earlier years has year files for
+those years, and its `[no_tax_from]` entry gives the first year with no
+tax at all (NH 2025, TN 2021), so later years don't fall back to its last
+file. `StateLaw.has_any_tax` says whether the state taxes any income in
+the law's year (wages, gains only or interest and dividends only), and
+`has_state_layer` whether any of it is in the State Tax layer.
+
+Such a tax is figured on the profile's interest and dividends (the kinds
+the file's `income` lists) plus the household's signed
+`state_investment_income_adjustment`: negative for interest the state
+exempts but the profile counts (U.S. Treasury interest, the state's own
+municipal bonds), positive for interest it taxes that the profile leaves
+out (Tennessee's corporate bond interest). Nothing else uses it. In the
+profile form the field is enabled only for a state and year with such a
+tax, and its tooltip names that tax and rate from the year's file.
+
 **Projection.** Years without a file are built from the newest enacted
 year by `federal/projection.toml`: indexed amounts (brackets, standard
 deductions, capital gains bands, IRMAA thresholds and premiums, poverty
@@ -200,7 +219,7 @@ recomputation, so the layers always sum exactly to the real change:
 | Enhanced Senior Deduction Phase-Out | the remaining federal income tax change, including gains it pushes out of the 0% band |
 | Education Credit Phase-Out | education credits lost to the MAGI phase-out, nonrefundable (as far as there was tax to use it) and refundable together |
 | Net Investment Income Tax | change in NIIT |
-| State Tax (XX) | change in state income tax, labelled with the state code |
+| State Tax (XX) | change in state income tax, labelled with the state code; includes a tax on interest and dividends only (NH, TN) |
 | State CG&QD Tax (XX) | change in tax under the state's own capital gains rules: Washington's gains tax, Montana's gains rates, Hawaii's gains rate cap (states that tax gains as regular income show them in State Tax) |
 | ACA Premium Tax Credit Phase-Out | premium tax credit lost on each extra dollar of ACA MAGI, leaving out the jumps at 100% and 400% FPL (those are lines) |
 | Nonrefundable Credit Absorbing Tax (drawn below 0%) | with the credit held at its starting amount, the extra tax it now cancels: negative, so with income tax below the credit the ordinary layer shows the bracket rate and this cancels it |

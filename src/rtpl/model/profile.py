@@ -75,6 +75,11 @@ class Household:
     short_term_capital_gains: float = 0.0  # net; may be negative; taxed as ordinary
     other_ordinary_income: float = 0.0
     other_investment_income: float = 0.0  # rents, royalties, passive (in NIIT)
+    # Signed change to the interest and dividends a state taxes on their own
+    # (NH to 2024, TN in 2020): minus U.S. Treasury or in-state municipal
+    # interest the state exempts, plus interest it taxes that the profile
+    # leaves out (TN's corporate bond interest). No effect on other taxes.
+    state_investment_income_adjustment: float = 0.0
     adjustments: float = 0.0  # above-the-line deductions (HSA, etc.)
     # HSA contributions deducted (forward plans; the marginal graph puts
     # them in adjustments). Kept apart so states without the deduction can
@@ -139,7 +144,8 @@ class Profile:
         data = dict(data)
         fields = Person.__dataclass_fields__
         people = [Person(**{k: v for k, v in p.items() if k in fields}) for p in data.pop("people", [])] or [Person()]
-        household = Household(**data.pop("household", {}))
+        hfields = Household.__dataclass_fields__
+        household = Household(**{k: v for k, v in data.pop("household", {}).items() if k in hfields})
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         return cls(people=people, household=household, **known)
 

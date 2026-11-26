@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 
 from rtpl.model.profile import Profile
-from rtpl.taxlaw.loader import Phaseout, StateCredit, StateLaw, status_key
+from rtpl.taxlaw.loader import InvestmentIncomeTax, Phaseout, StateCredit, StateLaw, status_key
 
 
 def _phased(amount: float, phaseout: Phaseout | None, incomes: dict[str, float], fs: str) -> float:
@@ -184,6 +184,58 @@ def state_credits(
     return total + sum(best_in_group.values())
 
 
+def total_income_all_sources(profile: Profile, *, extra_ira: float = 0.0, extra_qd: float = 0.0,
+                             extra_ltcg: float = 0.0) -> float:
+    """Income from every source, Social Security and tax-exempt interest
+    included and losses not subtracted (Tennessee's 65+ Hall tax test)."""
+    h = profile.household
+    return (
+        profile.total("wages") + profile.total("pension") + profile.total("ira_distributions") + extra_ira
+        + profile.total("social_security")
+        + h.taxable_interest + h.tax_exempt_interest
+        + h.qualified_dividends + h.nonqualified_dividends + extra_qd
+        + max(0.0, h.short_term_capital_gains) + max(0.0, h.long_term_capital_gains + extra_ltcg)
+        + max(0.0, h.other_ordinary_income) + max(0.0, h.other_investment_income)
+    )
+
+
+def investment_income_tax(
+    profile: Profile, tax: InvestmentIncomeTax, *, extra_ira: float = 0.0, extra_qd: float = 0.0,
+    extra_ltcg: float = 0.0,
+) -> float:
+    """Tax on interest and dividends only (NH's I&D tax, TN's Hall tax)."""
+    h = profile.household
+    fs = status_key(profile.filing_status)
+    amounts = {
+        "interest": h.taxable_interest,
+        "tax_exempt_interest": h.tax_exempt_interest,
+        "dividends": h.qualified_dividends + h.nonqualified_dividends + extra_qd,
+    }
+    income = sum(max(0.0, amounts[k]) for k in tax.income)
+    income = max(0.0, income + h.state_investment_income_adjustment)
+    if income <= 0:
+        return 0.0
+    ages = profile.ages()
+    if tax.exempt_from_age is not None and any(a >= tax.exempt_from_age for a in ages):
+        limit = tax.exempt_if_total_income_at_most
+        total = total_income_all_sources(profile, extra_ira=extra_ira, extra_qd=extra_qd, extra_ltcg=extra_ltcg)
+        if limit is None or total <= limit[fs]:
+            return 0.0
+    exemption = tax.exemption[fs]
+    if tax.blind_exempt:
+        # Each blind person's share of the income and of the exemption is exempt.
+        sighted = sum(1 for p in profile.people if not p.blind) / len(profile.people)
+        income *= sighted
+        exemption *= sighted
+    boxes = 0
+    if tax.extra_exemption_age is not None:
+        boxes += sum(1 for a in ages if a >= tax.extra_exemption_age)
+    if tax.extra_exemption_blind:
+        boxes += sum(1 for p in profile.people if p.blind)
+    exemption += tax.extra_exemption * boxes
+    return tax.rate * max(0.0, income - exemption)
+
+
 def state_income_tax(
     profile: Profile,
     state: StateLaw,
@@ -194,6 +246,8 @@ def state_income_tax(
     extra_ira: float = 0.0,
     federal_deduction: float = 0.0,
     tax_exempt_interest: float = 0.0,
+    extra_qd: float = 0.0,
+    extra_ltcg: float = 0.0,
 ) -> tuple[float, float]:
     """Return ``(income_tax, gains_tax)``.
 
@@ -204,6 +258,10 @@ def state_income_tax(
 
     ``federal_deduction`` is the federal standard or itemized deduction,
     which some state credits are figured from (Utah's taxpayer credit).
+
+    A tax on interest and dividends only (New Hampshire, Tennessee) is in
+    ``income_tax``. ``extra_qd`` and ``extra_ltcg`` are the marginal
+    graph's added dividends and gains, which that tax needs on their own.
     """
     fs = status_key(profile.filing_status)
     income_tax = gains_tax = 0.0
@@ -250,6 +308,10 @@ def state_income_tax(
         used = min(credits, income_tax)
         income_tax -= used
         gains_tax = max(0.0, gains_tax - (credits - used))
+    if state.investment_income_tax is not None:
+        income_tax += investment_income_tax(
+            profile, state.investment_income_tax, extra_ira=extra_ira, extra_qd=extra_qd, extra_ltcg=extra_ltcg,
+        )
     if state.gains_only_tax is not None:
         taxable_gains = max(0.0, net_ltcg - state.gains_only_deduction)
         gains_tax += state.gains_only_tax.tax(taxable_gains)
@@ -257,7 +319,9 @@ def state_income_tax(
 
 
 def has_state_tax(state: StateLaw | None) -> bool:
-    return state is not None and (state.has_income_tax or state.gains_only_tax is not None)
+    """The state taxes some kind of income in the law's year."""
+    return state is not None and state.has_any_tax
 
 
-__all__ = ["state_income_tax", "state_credits", "has_state_tax"]
+__all__ = ["state_income_tax", "state_credits", "has_state_tax", "investment_income_tax",
+           "total_income_all_sources"]

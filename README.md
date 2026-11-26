@@ -132,8 +132,9 @@ shipped one.
 Included: federal 2020 to 2027, and state files for 2020 to 2026 for all
 50 states plus DC (brackets, deductions and exemptions from the Tax
 Foundation's table for each year, corrected for cuts passed later in the
-year that applied to all of it, plus Social Security and pension/IRA exclusions for retirees, and
-Washington's capital gains tax). Each state file lists what it leaves out
+year that applied to all of it, plus Social Security and pension/IRA exclusions for retirees,
+Washington's capital gains tax, New Hampshire's interest and dividends tax
+to 2024 and Tennessee's Hall tax in 2020). Each state file lists what it leaves out
 under `notes`; hover over the state checkbox in the app to read them.
 
 See [docs/design.md](docs/design.md) for how everything works.

@@ -298,9 +298,11 @@ def test_tooltip_lines_fit_the_smallest_screen(window):
     from rtpl.model.profile import Profile
 
     tips = set()
-    for state in ("CA", "NC", "WA", "MT"):  # state notes and sources from the data files
+    for state, year in (("CA", None), ("NC", None), ("WA", None), ("MT", None), ("NH", 2023), ("TN", 2020)):
+        # State notes and sources come from the data files.
         prof = Profile.load(Path("examples/profiles/retired_couple_ca.json"))
         prof.state = state
+        prof.year = year or prof.year
         window._load_profile(prof, None)
         window.recompute()
         tips |= _all_tooltips(window)
@@ -534,6 +536,24 @@ def test_law_tips_read_the_tax_law_files():
     assert "$2,000" in stcg_tip(changed, "mfs")
     for tip in (charity_tip(changed, "mfj"), stcg_tip(changed, "mfs")):
         assert all(len(line) <= 70 for line in tip.split("\n"))
+
+def test_state_adjustment_field_follows_the_years_state_law(window):
+    from rtpl.app.profile_form import STATE_ADJUSTMENT_KEY
+
+    f = window.form
+    box = f.household_money[STATE_ADJUSTMENT_KEY]
+    f.state.setCurrentIndex(f.state.findData("NH"))
+    f.year.setValue(2023)
+    tax = window.library.state("NH", 2023).investment_income_tax
+    assert box.isEnabled() and tax.name in box.toolTip().replace("\n", " ") and "4%" in box.toolTip()
+    box.setValue(-1500)
+    assert f.profile().household.state_investment_income_adjustment == -1500
+    box.setValue(0)
+    f.year.setValue(2025)  # repealed
+    assert not box.isEnabled()
+    f.state.setCurrentIndex(f.state.findData("CA"))
+    assert not box.isEnabled()
+
 
 def test_new_profile_defaults(window, monkeypatch):
     """View > New Profile Defaults sets what File > New starts from, kept
