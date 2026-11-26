@@ -21,3 +21,12 @@ mfj    = [[0, 0.011], [67700, 0.0204], [163550, 0.0227], [249150, 0.0264], [4450
 [standard_deduction]
 single = 12950
 mfj    = 25900
+
+# Form ND-1ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

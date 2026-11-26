@@ -29,3 +29,16 @@ credit_per_person = 110
 [[retirement_exclusions]]
 amount = 12500
 min_age = 60
+
+# Form PIT-EST: the first installment is due April 30.
+[estimated_payments]
+notes = [
+  "Delaware's first installment is due April 30, later than the federal April 15.",
+  "Required when the tax not covered by withholding is expected to be more than $800.",
+]
+installments = [
+  { due = "04-30", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

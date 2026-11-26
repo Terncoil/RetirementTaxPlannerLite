@@ -31,3 +31,17 @@ per_person = 1144
 [[retirement_exclusions]]
 amount = "unlimited"
 applies_to = ["pension"]
+
+# Form N-1 (HRS 235-97): due on the 20th; Hawaii state holidays.
+[estimated_payments]
+holidays = ["new_year", "mlk", "washington", "good_friday", "memorial", "independence", "labor", "veterans", "thanksgiving", "christmas"]
+notes = [
+  "Hawaii's installments are due on the 20th of April, June, September and January.",
+  "Not required when the tax is less than $500.",
+]
+installments = [
+  { due = "04-20", share = 0.25 },
+  { due = "06-20", share = 0.25 },
+  { due = "09-20", share = 0.25 },
+  { due = "01-20", share = 0.25 },
+]

@@ -20,6 +20,8 @@ from importlib import resources
 from pathlib import Path
 from typing import Iterable
 
+from rtpl.taxlaw.estimated import EstimatedPayments, parse_estimated_payments
+
 FILING_STATUSES = ("single", "mfj", "mfs", "hoh")
 
 
@@ -162,6 +164,8 @@ class FederalLaw:
     # the first year it applies. None = not in the file (no deduction).
     charitable_nonitemizer_limit: dict[str, float] | None = None
     charitable_nonitemizer_first_year: int | None = None
+    # Form 1040-ES due dates and shares (None = not in the file).
+    estimated_payments: EstimatedPayments | None = None
 
     @property
     def senior_deduction_active(self) -> bool:
@@ -310,6 +314,7 @@ def _parse_federal(raw: dict) -> FederalLaw:
         charitable_nonitemizer_first_year=(
             int(charity["nonitemizer_first_year"]) if "nonitemizer_first_year" in charity else None
         ),
+        estimated_payments=parse_estimated_payments(raw.get("estimated_payments"), int(raw["year"])),
     )
 
 
@@ -555,6 +560,9 @@ class StateLaw:
     gains_only_deduction: float = 0.0
     gains_rates: dict[str, Schedule] | None = None  # separate stacked rates for long-term gains (MT)
     investment_income_tax: InvestmentIncomeTax | None = None  # interest and dividends only (NH, TN)
+    # When estimated tax is due and how much of it by each date (None for a
+    # state with no tax that year).
+    estimated_payments: EstimatedPayments | None = None
     notes: tuple[str, ...] = ()
     # Footnotes for the marginal graph where the file approximates the law
     # (a smoothed phase-out, say). Remove one when the file gets the exact rule.
@@ -703,6 +711,7 @@ def _parse_state(raw: dict) -> StateLaw:
             if "capital_gains_rates" in raw else None
         ),
         investment_income_tax=_parse_investment_tax(raw.get("investment_income_tax")),
+        estimated_payments=parse_estimated_payments(raw.get("estimated_payments"), raw.get("year")),
         notes=tuple(raw.get("notes", ())),
         chart_notes=tuple(raw.get("chart_notes", ())),
         sources=tuple(raw.get("sources", ())),
@@ -861,6 +870,9 @@ class TaxLawLibrary:
         for flag, last in sunsets.items():
             if year > int(last):
                 raw.setdefault("policy", {})[flag] = False
+        # A postponed or published exact date belongs to the base year only.
+        for inst in raw.get("estimated_payments", {}).get("installments", []):
+            inst.pop("due_date", None)
         raw["year"] = year
         raw["status"] = "projected"
         law = _parse_federal(raw)

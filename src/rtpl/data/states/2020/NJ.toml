@@ -39,3 +39,15 @@ min_age = 65
 min_age = 62
 per_return = { single = 75000, mfj = 100000, mfs = 50000, hoh = 75000 }
 phaseout = { income = "agi_ex_ss", start = { single = 100000, mfj = 100000 } }
+
+# Form NJ-1040-ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "2020: COVID-19 relief moved the first installment to July 15, 2020; the second stayed due June 15 (Tax Foundation table as of May 19, 2020).",
+]
+installments = [
+  { due = "04-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

@@ -18,3 +18,15 @@ mfj    = 17700
 
 [exemption]
 credit_per_person = 176
+
+# Form 1040N-ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding and credits is $500 or more.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

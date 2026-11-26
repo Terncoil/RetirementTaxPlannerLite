@@ -16,3 +16,15 @@ mfj    = [[0, 0], [80975, 0.0195], [298075, 0.025]]
 [standard_deduction]
 single = 16100
 mfj    = 32200
+
+# Form ND-1ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when federal estimates are required and this year's and last year's tax not covered by withholding are each $1,000 or more.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

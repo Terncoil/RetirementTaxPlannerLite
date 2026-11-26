@@ -15,3 +15,15 @@ mfj    = [[0, 0.04], [10000, 0.06], [40000, 0.065], [60000, 0.085], [250000, 0.0
 [standard_deduction]
 single = 16100
 mfj    = 32200
+
+# Form D-40ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax owed is expected to be $100 or more.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

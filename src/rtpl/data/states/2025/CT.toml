@@ -42,3 +42,15 @@ phaseout = { income = "agi", tiers = [{ up_to = { single = 74999.99, mfj = 99999
 [[retirement_exclusions]]
 applies_to = ["ira"]
 phaseout = { income = "agi", tiers = [{ up_to = { single = 74999.99, mfj = 99999.99 }, keep = 0.75 }, { up_to = { single = 77499.99, mfj = 104999.99 }, keep = 0.6375 }, { up_to = { single = 79999.99, mfj = 109999.99 }, keep = 0.525 }, { up_to = { single = 82499.99, mfj = 114999.99 }, keep = 0.4125 }, { up_to = { single = 84999.99, mfj = 119999.99 }, keep = 0.3 }, { up_to = { single = 87499.99, mfj = 124999.99 }, keep = 0.1875 }, { up_to = { single = 89999.99, mfj = 129999.99 }, keep = 0.075 }, { up_to = { single = 94999.99, mfj = 139999.99 }, keep = 0.0375 }, { up_to = { single = 99999.99, mfj = 149999.99 }, keep = 0.01875 }] }
+
+# Form CT-1040ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding is $1,000 or more.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

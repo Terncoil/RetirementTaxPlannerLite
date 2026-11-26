@@ -23,3 +23,15 @@ mfj    = [[0, 0.011], [65900, 0.0204], [159200, 0.0227], [242550, 0.0264], [4332
 [standard_deduction]
 single = 12400
 mfj    = 24800
+
+# Form ND-1ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "2020: COVID-19 relief moved the first two installments to July 15, 2020 (Tax Foundation table of state actions as of May 19, 2020).",
+]
+installments = [
+  { due = "04-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "06-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

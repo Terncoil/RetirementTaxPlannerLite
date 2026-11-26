@@ -25,3 +25,15 @@ mfj    = 4600
 
 [exemption]
 per_person = 3200
+
+# Form PV (502D): the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "2020: COVID-19 relief moved the first two installments to July 15, 2020 (Tax Foundation table of state actions as of May 19, 2020).",
+]
+installments = [
+  { due = "04-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "06-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

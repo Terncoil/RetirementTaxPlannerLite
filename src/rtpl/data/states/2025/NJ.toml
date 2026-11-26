@@ -41,3 +41,15 @@ per_return = { single = 75000, mfj = 100000, mfs = 50000, hoh = 75000 }
 # Above $100K the exclusion is a share of all pension/IRA income, uncapped.
 phased_share_of = "income"
 phaseout = { income = "agi_ex_ss", tiers = [{ up_to = { single = 100000, mfj = 100000 }, keep = 1 }, { up_to = { single = 125000, mfj = 125000 }, keep = { single = 0.375, mfj = 0.5, mfs = 0.25 } }, { up_to = { single = 150000, mfj = 150000 }, keep = { single = 0.1875, mfj = 0.25, mfs = 0.125 } }] }
+
+# Form NJ-1040-ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding and credits is more than $400.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

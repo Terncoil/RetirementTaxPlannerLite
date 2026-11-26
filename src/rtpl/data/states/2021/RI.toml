@@ -38,3 +38,12 @@ amount = 15000
 min_age = 67
 applies_to = ["pension"]
 phaseout = { start = { single = 88950, mfj = 111200 } }
+
+# Form RI-1040ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

@@ -42,3 +42,12 @@ per_person = 450
 born_before = 1953
 group = "retirement"
 phaseout = { start = { single = 25000, mfj = 32000, hoh = 32000, mfs = 16000 }, rate = 0.025, income = "magi" }
+
+# Utah has no estimated payments for individuals.
+[estimated_payments]
+required = false
+notes = [
+  "Utah doesn't require estimated payments from individuals; the tax is due with the return.",
+  "To use Utah's automatic extension, prepay 90% of this year's tax or 100% of last year's by the return's due date (Form TC-546).",
+]
+installments = []

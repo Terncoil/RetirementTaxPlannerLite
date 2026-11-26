@@ -29,3 +29,12 @@ per_person = 2000
 [social_security]
 exempt_if_agi_at_most = { single = 50000, mfj = 100000 }
 exempt_fraction_above = 0.0
+
+# Form IT-140ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

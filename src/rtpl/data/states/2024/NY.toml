@@ -27,3 +27,12 @@ mfj    = 16050
 [[retirement_exclusions]]
 amount = 20000
 min_age = 60
+
+# Form IT-2105: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

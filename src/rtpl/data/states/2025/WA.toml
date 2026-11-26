@@ -16,3 +16,16 @@ notes = [
 [capital_gains_tax]
 deduction = 278000
 brackets = [[0, 0.07], [1000000, 0.099]]
+
+# Capital gains excise tax: no quarterly payments; paid with the return,
+# due the same day as the federal return (RCW 82.87.110).
+[estimated_payments]
+required = false
+annual_only = true
+notes = [
+  "Washington's capital gains tax has no quarterly estimated payments; it is paid once, with the return, by the federal return's due date.",
+  "2025: the Department of Revenue moved the due date to May 1, 2026, matching IRS storm relief.",
+]
+installments = [
+  { due = "04-15", share = 1.00, due_date = 2026-05-01 },
+]

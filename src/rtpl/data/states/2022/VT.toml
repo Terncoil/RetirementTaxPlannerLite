@@ -29,3 +29,12 @@ per_person = 4350
 [social_security]
 exempt_if_agi_at_most = { single = 45000, mfj = 60000 }
 phaseout_width = { single = 10000, mfj = 10000 }
+
+# Form IN-114: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

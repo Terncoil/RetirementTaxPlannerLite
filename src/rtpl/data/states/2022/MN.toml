@@ -22,3 +22,12 @@ mfj    = [[0, 0.0535], [41050, 0.068], [163060, 0.0785], [284810, 0.0985]]
 [standard_deduction]
 single = 12900
 mfj    = 25800
+
+# Form M14: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

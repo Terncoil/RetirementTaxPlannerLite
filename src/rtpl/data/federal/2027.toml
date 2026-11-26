@@ -137,3 +137,14 @@ split_interest_limit = 57000
 self_only = 4500
 family = 9000
 catch_up = 1000
+
+# Form 1040-ES (IRC 6654): a quarter of the required annual payment for each
+# period. A due date on a Saturday, Sunday or legal holiday in the District
+# of Columbia moves to the next business day (IRC 7503).
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

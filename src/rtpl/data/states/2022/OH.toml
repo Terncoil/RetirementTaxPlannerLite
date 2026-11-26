@@ -27,3 +27,12 @@ mfj    = 0
 [exemption]
 per_person = 2400
 phaseout = { income = "state_income", tiers = [{ up_to = { single = 40000, mfj = 40000 }, keep = 1 }, { up_to = { single = 80000, mfj = 80000 }, keep = 0.895833 }, { up_to = {  }, keep = 0.791667 }] }
+
+# Form IT 1040ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

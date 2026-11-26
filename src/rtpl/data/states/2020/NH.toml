@@ -22,3 +22,16 @@ rate = 0.05
 income = ["interest", "tax_exempt_interest", "dividends"]
 exemption = { single = 2400, mfj = 4800 }
 extra_exemption = { amount = 1200, min_age = 65, blind = true }
+
+# Interest and Dividends Tax, Form DP-10-ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Estimates of the Interest and Dividends Tax are required when the year's tax is $500 or more.",
+  "2020: COVID-19 relief moved the first installment to June 15, 2020 (Tax Foundation table as of May 19, 2020).",
+]
+installments = [
+  { due = "04-15", share = 0.25, due_date = 2020-06-15 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

@@ -38,3 +38,12 @@ exempt_fraction_above = 0.75
 [[retirement_exclusions]]
 applies_to = ["pension"]
 phaseout = { income = "agi", tiers = [{ up_to = { single = 74999.99, mfj = 99999.99 }, keep = 1 }, { up_to = { single = 77499.99, mfj = 104999.99 }, keep = 0.85 }, { up_to = { single = 79999.99, mfj = 109999.99 }, keep = 0.7 }, { up_to = { single = 82499.99, mfj = 114999.99 }, keep = 0.55 }, { up_to = { single = 84999.99, mfj = 119999.99 }, keep = 0.4 }, { up_to = { single = 87499.99, mfj = 124999.99 }, keep = 0.25 }, { up_to = { single = 89999.99, mfj = 129999.99 }, keep = 0.1 }, { up_to = { single = 94999.99, mfj = 139999.99 }, keep = 0.05 }, { up_to = { single = 99999.99, mfj = 149999.99 }, keep = 0.025 }] }
+
+# Form CT-1040ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

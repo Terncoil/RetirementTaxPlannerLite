@@ -29,3 +29,12 @@ mfj    = 27650
 [social_security]
 exempt_if_agi_at_most = { single = 78000, mfj = 100000 }
 phaseout_width = { single = 40000, mfj = 40000 }
+
+# Form M14: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

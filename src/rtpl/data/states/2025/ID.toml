@@ -20,3 +20,11 @@ mfj    = [[0, 0], [9346, 0.05695]]
 [standard_deduction]
 single = 15000
 mfj    = 30000
+
+# Idaho doesn't require estimated payments from individuals (Form 51 is optional).
+[estimated_payments]
+required = false
+notes = [
+  "Idaho doesn't require estimated payments from individuals. Payments can be made at any time with Form 51; the tax is due with the return.",
+]
+installments = []

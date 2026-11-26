@@ -25,3 +25,15 @@ mfj    = 6700
 
 [exemption]
 per_person = 3200
+
+# Form PV (502D): the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when income not subject to withholding is expected to bring more than $500 of tax.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]
