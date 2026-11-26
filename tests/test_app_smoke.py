@@ -505,6 +505,21 @@ def test_charitable_gifts_field(window):
     assert "$3,000" in stcg.toolTip()
 
 
+
+def test_check_boxes_have_their_label_on_the_left(window):
+    from PySide6.QtWidgets import QFormLayout
+
+    form = window.form
+    for box, text in ((form.person_boxes[0].blind, "Legally blind"),
+                      (form.brokerage, "Taxable brokerage account"),
+                      (form.aca, "ACA marketplace coverage")):
+        assert box.text() == ""
+        layout = box.parentWidget().layout()
+        assert isinstance(layout, QFormLayout)
+        label = layout.labelForField(box)
+        assert label is not None and label.text() == text
+        assert box.accessibleName() == text
+
 def test_law_tips_read_the_tax_law_files():
     from dataclasses import replace
 

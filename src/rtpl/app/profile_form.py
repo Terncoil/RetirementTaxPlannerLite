@@ -178,7 +178,7 @@ class PersonBox(QGroupBox):
         self.medicare = ComboBox()
         for text, _ in MEDICARE_CHOICES:
             self.medicare.addItem(text)
-        self.blind = QCheckBox("Legally blind")
+        self.blind = QCheckBox()
         _add_row(form, "Name", self.name)
         birth_label = QLabel("Birth year")
         birth_label.setBuddy(self.birth_year)
@@ -195,7 +195,7 @@ class PersonBox(QGroupBox):
             self.medicare,
             "Choose Yes for Medicare before 65 (for example on SSDI),\nso IRMAA applies.",
         )
-        form.addRow("", self.blind)
+        _add_row(form, "Legally blind", self.blind)
         self.money: dict[str, DoubleSpinBox] = {}
         for key, text in PERSON_MONEY:
             box = money_box()
@@ -307,10 +307,10 @@ class ProfileForm(QWidget):
             self.household_money[key] = box
             _add_row(hform, text, box, MONEY_TIPS.get(key))
             box.valueChanged.connect(self._emit)
-        self.brokerage = QCheckBox("Taxable brokerage account")
-        self.brokerage.setToolTip("The household has a taxable brokerage account.")
-        self.aca = QCheckBox("ACA marketplace coverage")
-        self.aca.setToolTip("The household buys health coverage on an ACA marketplace.")
+        # Check boxes go in the field column with their label on the left,
+        # like every other row.
+        self.brokerage = QCheckBox()
+        self.aca = QCheckBox()
         self.household_size = SpinBox()
         self.household_size.setRange(0, 20)
         self.household_size.setSpecialValueText("Automatic")
@@ -318,8 +318,10 @@ class ProfileForm(QWidget):
         self.aca_tier = ComboBox()
         for key, text in ACA_PLAN_TIERS.items():
             self.aca_tier.addItem(text, key)
-        hform.addRow("", self.brokerage)
-        hform.addRow("", self.aca)
+        _add_row(hform, "Taxable brokerage account", self.brokerage,
+                 "The household has a taxable brokerage account.")
+        _add_row(hform, "ACA marketplace coverage", self.aca,
+                 "The household buys health coverage on an ACA marketplace.")
         _add_row(hform, "ACA plan tier", self.aca_tier,
                  "Metal tier of the marketplace plan. Cost-sharing reductions (the\n"
                  "250% FPL line) only come with a Silver plan.")
