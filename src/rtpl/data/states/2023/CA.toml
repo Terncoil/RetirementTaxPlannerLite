@@ -27,3 +27,16 @@ mfj    = 10404
 
 [exemption]
 credit_per_person = 140
+
+# Form 540-ES: 30% / 40% / 0% / 30%, no September payment (R&TC 19136.1).
+[estimated_payments]
+notes = [
+  "California's installments are 30%, 40%, 0% and 30% of the year's required payment; nothing is due in September.",
+  "2023: disaster relief moved the April, June and September installments to November 16, 2023 in 55 of the 58 counties; not applied here.",
+]
+installments = [
+  { due = "04-15", share = 0.30 },
+  { due = "06-15", share = 0.40 },
+  { share = 0.00 },
+  { due = "01-15", share = 0.30 },
+]

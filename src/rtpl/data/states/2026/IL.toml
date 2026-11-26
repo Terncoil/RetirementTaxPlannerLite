@@ -24,3 +24,15 @@ per_person = 2925
 
 [[retirement_exclusions]]
 amount = "unlimited"
+
+# Form IL-1040-ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding and credits is more than $1,000.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

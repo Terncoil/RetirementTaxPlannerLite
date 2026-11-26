@@ -25,3 +25,15 @@ exemption = { single = 1250, mfj = 2500 }
 exempt_from_age = 65
 exempt_if_total_income_at_most = { single = 37000, mfj = 68000 }
 blind_exempt = true
+
+# Hall income tax: no estimated payments; paid with the return.
+[estimated_payments]
+required = false
+annual_only = true
+notes = [
+  "Tennessee doesn't require estimated payments of the Hall income tax; it is paid with the return.",
+  "The 2020 return and payment were due May 17, 2021, when the state followed the federal postponement.",
+]
+installments = [
+  { due = "04-15", share = 1.00, due_date = 2021-05-17 },
+]

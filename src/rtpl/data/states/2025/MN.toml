@@ -29,3 +29,15 @@ mfj    = 29900
 [social_security]
 exempt_if_agi_at_most = { single = 84490, mfj = 108320 }
 phaseout_width = { single = 40000, mfj = 40000 }
+
+# Form M14: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding and refundable credits is $500 or more.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

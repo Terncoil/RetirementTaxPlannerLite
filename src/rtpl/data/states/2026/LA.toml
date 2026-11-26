@@ -19,3 +19,15 @@ mfj    = 25750
 [[retirement_exclusions]]
 amount = 6000
 min_age = 65
+
+# Form IT-540ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax not covered by withholding and credits is more than $1,000 ($2,000 joint).",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

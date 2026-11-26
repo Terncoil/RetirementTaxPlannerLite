@@ -25,3 +25,17 @@ mfj    = 0
 
 [exemption]
 per_person = 4400
+
+# Form 1-ES: the federal due dates, a quarter each.
+[estimated_payments]
+holidays = ["federal", "patriots"]
+notes = [
+  "A due date on Patriots' Day (the third Monday in April) moves to the next business day.",
+  "Required when the tax on income not subject to withholding is more than $400.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

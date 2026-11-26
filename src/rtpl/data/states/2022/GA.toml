@@ -29,3 +29,12 @@ per_person = 2700
 [[retirement_exclusions]]
 amount = 65000
 min_age = 65
+
+# Form 500-ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

@@ -29,3 +29,15 @@ credit_per_person = 40
 [[retirement_exclusions]]
 amount = 6000
 min_age = 55
+
+# Form IA 1040ES (Iowa Admin. Code 701-308.2): due the last day of the month.
+[estimated_payments]
+notes = [
+  "Iowa's installments are due April 30, June 30, September 30 and January 31, later than the federal dates.",
+]
+installments = [
+  { due = "04-30", share = 0.25 },
+  { due = "06-30", share = 0.25 },
+  { due = "09-30", share = 0.25 },
+  { due = "01-31", share = 0.25 },
+]

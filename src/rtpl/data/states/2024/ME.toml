@@ -25,3 +25,16 @@ mfj    = 29200
 
 [exemption]
 per_person = 5000
+
+# Form 1040ES-ME: the federal due dates, a quarter each.
+[estimated_payments]
+holidays = ["federal", "patriots"]
+notes = [
+  "A due date on Patriots' Day (the third Monday in April) moves to the next business day.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

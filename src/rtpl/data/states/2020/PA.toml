@@ -26,3 +26,17 @@ mfj    = 0
 [[retirement_exclusions]]
 amount = "unlimited"
 min_age = 60
+
+# Form PA-40 ES: the federal due dates, a quarter each.
+# PA's own instructions could not be reached when this was written;
+# these are the dates the PA-40 ES vouchers have long used.
+[estimated_payments]
+notes = [
+  "2020: COVID-19 relief moved the first two installments to July 15, 2020 (Tax Foundation table of state actions as of May 19, 2020).",
+]
+installments = [
+  { due = "04-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "06-15", share = 0.25, due_date = 2020-07-15 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

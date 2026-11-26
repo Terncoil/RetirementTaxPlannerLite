@@ -26,3 +26,15 @@ credit_per_person = 29
 
 [[retirement_exclusions]]
 amount = 6000
+
+# Form AR1000ES: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the estimated tax is more than $1,000.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

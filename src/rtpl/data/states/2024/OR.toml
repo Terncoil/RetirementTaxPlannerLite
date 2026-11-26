@@ -25,3 +25,12 @@ mfj    = 5495
 
 [exemption]
 credit_per_person = 249
+
+# Form OR-40-V: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

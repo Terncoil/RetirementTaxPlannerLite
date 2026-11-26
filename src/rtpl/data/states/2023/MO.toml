@@ -30,3 +30,12 @@ mfj    = 27700
 
 [social_security]
 exempt_if_agi_at_most = { single = 85000, mfj = 100000 }
+
+# Form MO-1040ES: the federal due dates, a quarter each.
+[estimated_payments]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]

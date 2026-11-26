@@ -29,3 +29,15 @@ per_person = 6000
 [[retirement_exclusions]]
 amount = "unlimited"
 min_age = 60
+
+# Form 80-106: the federal due dates, a quarter each.
+[estimated_payments]
+notes = [
+  "Required when the tax is over $200 and withholding covers less than 80% of it.",
+]
+installments = [
+  { due = "04-15", share = 0.25 },
+  { due = "06-15", share = 0.25 },
+  { due = "09-15", share = 0.25 },
+  { due = "01-15", share = 0.25 },
+]
