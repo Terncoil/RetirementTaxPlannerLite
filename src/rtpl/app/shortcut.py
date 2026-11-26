@@ -1,6 +1,10 @@
 """Make a desktop and Start-menu shortcut, with the app icon, for the app
 as installed in this Python environment: ``uv run rtpl-shortcut``.
 
+It also registers the ``.rtpl`` file type, so double-clicking a file opens
+it in the app (see ``rtpl.app.documents``). Help > Open .rtpl Files With
+This App does only that, for the downloaded Windows build too.
+
 Packaged builds get their shortcuts from the installer instead (see
 ``docs/packaging.md``).
 """
@@ -14,6 +18,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from rtpl.app.documents import DOCUMENT_TYPES, desktop_mime_types, linux_mime_xml
 from rtpl.app.icon import DESKTOP_FILE_NAME, ico_path, largest_png
 
 APP_NAME = "RetirementTaxPlannerLite"
@@ -63,7 +68,8 @@ def windows_shortcut_script(target: str, args: list[str], icon: Path) -> str:
 
 
 def desktop_entry(target: str, args: list[str], icon: Path | str) -> str:
-    exec_line = " ".join(_desktop_quote(a) for a in [target, *args])
+    # %f: the file manager puts the double-clicked file's path here.
+    exec_line = " ".join(_desktop_quote(a) for a in [target, *args]) + " %f"
     return (
         "[Desktop Entry]\n"
         "Type=Application\n"
@@ -73,6 +79,7 @@ def desktop_entry(target: str, args: list[str], icon: Path | str) -> str:
         f"Icon={icon}\n"
         "Terminal=false\n"
         "Categories=Office;Finance;\n"
+        f"MimeType={desktop_mime_types()}\n"
         f"StartupWMClass={DESKTOP_FILE_NAME}\n"
     )
 
@@ -81,6 +88,43 @@ def _desktop_quote(arg: str) -> str:
     if any(c in arg for c in ' \t"\'\\$`'):
         return '"' + arg.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`") + '"'
     return arg
+
+
+def windows_open_command(target: str, args: list[str]) -> str:
+    """The shell\\open\\command value: the app, then the double-clicked file."""
+    return " ".join(f'"{a}"' for a in [target, *args, "%1"])
+
+
+def windows_registry_values(target: str, args: list[str], icon: Path) -> list[tuple[str, str]]:
+    """(key under HKCU\\Software\\Classes, default value) for each document type.
+
+    Per-user keys need no administrator rights, which suits a build unzipped
+    anywhere as well as a Python environment."""
+    values = []
+    for doc in DOCUMENT_TYPES:
+        values += [
+            (doc.suffix, doc.prog_id),
+            (doc.prog_id, doc.description),
+            (rf"{doc.prog_id}\DefaultIcon", f'"{icon}",0'),
+            (rf"{doc.prog_id}\shell\open\command", windows_open_command(target, args)),
+        ]
+    return values
+
+
+def register_windows() -> list[str]:
+    """Register the document types for the current user (Windows only)."""
+    import ctypes
+    import winreg
+
+    target, args = launch_command()
+    made = []
+    for key, value in windows_registry_values(target, args, ico_path()):
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Classes\{key}") as handle:
+            winreg.SetValueEx(handle, "", 0, winreg.REG_SZ, value)
+        made.append(rf"HKCU\Software\Classes\{key}")
+    # Tell Explorer the associations changed (SHCNE_ASSOCCHANGED, SHCNF_IDLIST).
+    ctypes.windll.shell32.SHChangeNotify(0x08000000, 0, None, None)
+    return made
 
 
 def make_windows() -> list[str]:
@@ -92,23 +136,57 @@ def make_windows() -> list[str]:
         capture_output=True,
         text=True,
     )
-    return [line for line in out.stdout.splitlines() if line.strip()]
+    made = [line for line in out.stdout.splitlines() if line.strip()]
+    return made + register_windows()
 
 
-def make_linux() -> list[str]:
+def _data_home() -> Path:
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+
+
+def _run_if_present(*command: str) -> None:
+    if shutil.which(command[0]):
+        subprocess.run(command, check=False, capture_output=True)
+
+
+def register_linux_mime() -> list[str]:
+    """Install the shared-mime-info package and make the app the default for it."""
+    data_home = _data_home()
+    packages = data_home / "mime" / "packages"
+    packages.mkdir(parents=True, exist_ok=True)
+    xml = packages / f"{DESKTOP_FILE_NAME}.xml"
+    xml.write_text(linux_mime_xml(), encoding="utf-8")
+    _run_if_present("update-mime-database", str(data_home / "mime"))
+    _run_if_present("update-desktop-database", str(data_home / "applications"))
+    for doc in DOCUMENT_TYPES:
+        _run_if_present("xdg-mime", "default", f"{DESKTOP_FILE_NAME}.desktop", doc.mime_type)
+    return [str(xml)]
+
+
+def make_linux(on_desktop: bool = True) -> list[str]:
     target, args = launch_command()
-    data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
-    apps = data_home / "applications"
+    apps = _data_home() / "applications"
     apps.mkdir(parents=True, exist_ok=True)
     entry = desktop_entry(target, args, largest_png())
     written = [apps / f"{DESKTOP_FILE_NAME}.desktop"]
     desktop = Path.home() / "Desktop"
-    if desktop.is_dir():
+    if on_desktop and desktop.is_dir():
         written.append(desktop / f"{DESKTOP_FILE_NAME}.desktop")
     for path in written:
         path.write_text(entry, encoding="utf-8")
         path.chmod(path.stat().st_mode | stat.S_IXUSR)
-    return [str(p) for p in written]
+    return [str(p) for p in written] + register_linux_mime()
+
+
+def register_file_types() -> list[str]:
+    """Make double-clicking a document open it in this copy of the app.
+
+    On Linux this also writes the menu entry, which names the app's file types."""
+    if sys.platform == "win32":
+        return register_windows()
+    if sys.platform.startswith("linux"):
+        return make_linux(on_desktop=False)
+    raise RuntimeError("On macOS the app bundle registers its file types itself.")
 
 
 def main() -> int:

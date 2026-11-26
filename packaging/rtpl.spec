@@ -19,6 +19,7 @@ APP_NAME = "RetirementTaxPlannerLite"
 
 sys.path.insert(0, str(ROOT / "src"))
 from rtpl import __version__  # the one source of the version
+from rtpl.app.documents import macos_plist_entries  # .rtpl opens by double-click
 
 if sys.platform == "win32":
     # Version resource: Explorer shows it under Properties > Details.
@@ -80,5 +81,10 @@ if sys.platform == "darwin":
         icon=exe_icon,
         bundle_identifier="io.github.magixdragon.rtpl",
         version=__version__,
-        info_plist={"NSHighResolutionCapable": True, "CFBundleVersion": __version__},
+        info_plist={
+            "NSHighResolutionCapable": True,
+            "CFBundleVersion": __version__,
+            # Finder opens .rtpl files with the app (see rtpl/app/documents.py)
+            **macos_plist_entries(Path(exe_icon).name),
+        },
     )

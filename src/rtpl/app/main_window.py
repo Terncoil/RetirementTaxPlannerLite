@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import textwrap
 from datetime import date
 from pathlib import Path
@@ -45,6 +46,13 @@ from PySide6.QtWidgets import (
 from rtpl import __version__
 from rtpl.app import TIP_WIDTH
 from rtpl.export import write_csv, write_ods
+from rtpl.app.documents import (
+    OPEN_FILTER,
+    RTPL_SUFFIX,
+    SAVE_FILTER,
+    save_as_start,
+    with_rtpl_suffix,
+)
 from rtpl.app.icon import about_pixmap
 from rtpl.app.inputs import ComboBox
 from rtpl.app.plan_editor import PlanEditor
@@ -726,6 +734,11 @@ class MainWindow(QMainWindow):
         home = QAction("&Project Home…", self, triggered=self.open_project_home)
         home.setToolTip("Open the project's GitHub page in your web browser")
         h.addAction(home)
+        if sys.platform == "win32" or sys.platform.startswith("linux"):
+            assoc = QAction("Open .rtpl Files With &This App", self, triggered=self.register_file_types)
+            assoc.setToolTip("Make double-clicking a .rtpl file open it in this copy of the app.\n"
+                             "Do it again if you move the app to another folder")
+            h.addAction(assoc)
         h.addSeparator()
         h.addAction(QAction("&About", self, triggered=self.about))
 
@@ -898,9 +911,27 @@ class MainWindow(QMainWindow):
         """File > Open: a profile or a plan, whichever the file holds."""
         if not self.maybe_save():
             return
-        path, _ = QFileDialog.getOpenFileName(self, "Open", "", "Profiles and plans (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Open", "", OPEN_FILTER)
         if path:
             self.open_file(Path(path))
+
+    def open_from_os(self, path: Path) -> None:
+        """A file double-clicked while the app is running (macOS sends these)."""
+        self.raise_()
+        self.activateWindow()
+        if self.maybe_save():
+            self.open_file(path)
+
+    def register_file_types(self) -> None:
+        """Help > Open .rtpl Files With This App (Windows and Linux)."""
+        from rtpl.app.shortcut import register_file_types
+
+        try:
+            register_file_types()
+        except (OSError, RuntimeError) as exc:
+            QMessageBox.warning(self, APP_NAME, f"Could not register the .rtpl file type:\n{exc}")
+            return
+        QMessageBox.information(self, APP_NAME, "Double-clicking a .rtpl file now opens it in this app.")
 
     def open_file(self, path: Path) -> None:
         """Open a profile or a plan; a plan file is recognized by its "profile" section."""
@@ -931,17 +962,17 @@ class MainWindow(QMainWindow):
     def save_as(self) -> bool:
         """File > Save As: what is open (the plan, or else the profile) under a new name."""
         if self.plan_view.plan is not None:
-            start = str(self.plan_path) if self.plan_path else self._suggested_plan_path(".json")
-            path, _ = QFileDialog.getSaveFileName(self, "Save Plan As", start, "Plans (*.json)")
+            start = save_as_start(self.plan_path, self._suggested_plan_path(RTPL_SUFFIX))
+            path, _ = QFileDialog.getSaveFileName(self, "Save Plan As", start, SAVE_FILTER)
             if not path:
                 return False
-            self.plan_path = Path(path)
+            self.plan_path = with_rtpl_suffix(Path(path))
             return self._save_plan()
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save Profile As", self._suggested_path(".json"), "Profiles (*.json)")
+        start = save_as_start(self.current_path, self._suggested_path(RTPL_SUFFIX))
+        path, _ = QFileDialog.getSaveFileName(self, "Save Profile As", start, SAVE_FILTER)
         if not path:
             return False
-        self.current_path = Path(path)
+        self.current_path = with_rtpl_suffix(Path(path))
         return self.save()
 
     def save_profile_as(self) -> bool:
@@ -952,10 +983,10 @@ class MainWindow(QMainWindow):
         if self.plan_view.plan is None:
             return self.save_as()
         path, _ = QFileDialog.getSaveFileName(
-            self, "Save Profile As", self._suggested_path(".json"), "Profiles (*.json)")
+            self, "Save Profile As", self._suggested_path(RTPL_SUFFIX), SAVE_FILTER)
         if not path:
             return False
-        return self._write_profile(Path(path))
+        return self._write_profile(with_rtpl_suffix(Path(path)))
 
     def _write_profile(self, path: Path) -> bool:
         try:
@@ -972,7 +1003,7 @@ class MainWindow(QMainWindow):
         return str(folder / (safe_file_stem(self.form.plan_name.text()) + suffix))
 
     def _suggested_plan_path(self, suffix: str) -> str:
-        """Baseline name plus the plan's own name, e.g. "Smith - Roth until SS.json"."""
+        """Baseline name plus the plan's own name, e.g. "Smith - Roth until SS.rtpl"."""
         plan = self.plan_view.plan
         assert plan is not None
         plan.profile = self.form.profile()
