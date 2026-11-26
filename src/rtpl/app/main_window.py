@@ -10,7 +10,7 @@ from pathlib import Path
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
-from PySide6.QtCore import QEvent, QSettings, QStandardPaths, Qt, QTimer, QUrl
+from PySide6.QtCore import QEvent, QSettings, QSignalBlocker, QStandardPaths, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QIcon, QPixmap, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (
     QApplication,
@@ -54,6 +54,12 @@ from rtpl.app.documents import (
     with_rtpl_suffix,
 )
 from rtpl.app.icon import about_pixmap
+from rtpl.app.shortcut import (
+    can_register_file_types,
+    file_types_registered,
+    register_file_types,
+    unregister_file_types,
+)
 from rtpl.app.inputs import ComboBox
 from rtpl.app.plan_editor import PlanEditor
 from rtpl.app.plan_view import PlanView
@@ -728,17 +734,26 @@ class MainWindow(QMainWindow):
         defaults.setToolTip("Choose the values File > New starts from, such as filing status,\n"
                             "state, inflation and Social Security")
         v.addAction(defaults)
+        # Ticked while the OS opens .rtpl files with this copy of the app; it
+        # reads the OS each time the menu opens. macOS: the bundle does it.
+        self.file_types_action = None
+        if can_register_file_types():
+            v.addSeparator()
+            self.file_types_action = QAction("Open .rtpl Files With &This App", self, checkable=True)
+            self.file_types_action.setToolTip(
+                "Ticked: double-clicking a .rtpl file opens it in this copy of the app.\n"
+                "Untick to stop. If you move the app to another folder, the tick\n"
+                "clears; tick it again")
+            self.file_types_action.toggled.connect(self._file_types_toggled)
+            v.addAction(self.file_types_action)
+            v.aboutToShow.connect(self.refresh_file_types_action)
+            self.refresh_file_types_action()
 
         h = self.menuBar().addMenu("&Help")
         h.setToolTipsVisible(True)
         home = QAction("&Project Home…", self, triggered=self.open_project_home)
         home.setToolTip("Open the project's GitHub page in your web browser")
         h.addAction(home)
-        if sys.platform == "win32" or sys.platform.startswith("linux"):
-            assoc = QAction("Open .rtpl Files With &This App", self, triggered=self.register_file_types)
-            assoc.setToolTip("Make double-clicking a .rtpl file open it in this copy of the app.\n"
-                             "Do it again if you move the app to another folder")
-            h.addAction(assoc)
         h.addSeparator()
         h.addAction(QAction("&About", self, triggered=self.about))
 
@@ -922,16 +937,33 @@ class MainWindow(QMainWindow):
         if self.maybe_save():
             self.open_file(path)
 
-    def register_file_types(self) -> None:
-        """Help > Open .rtpl Files With This App (Windows and Linux)."""
-        from rtpl.app.shortcut import register_file_types
-
-        try:
-            register_file_types()
-        except (OSError, RuntimeError) as exc:
-            QMessageBox.warning(self, APP_NAME, f"Could not register the .rtpl file type:\n{exc}")
+    def refresh_file_types_action(self) -> None:
+        """Tick View > Open .rtpl Files With This App to match the OS."""
+        if self.file_types_action is None:
             return
-        QMessageBox.information(self, APP_NAME, "Double-clicking a .rtpl file now opens it in this app.")
+        try:
+            registered = file_types_registered()
+        except OSError:
+            registered = False
+        with QSignalBlocker(self.file_types_action):
+            self.file_types_action.setChecked(registered)
+
+    def _file_types_toggled(self, checked: bool) -> None:
+        """View > Open .rtpl Files With This App (Windows and Linux)."""
+        try:
+            if checked:
+                register_file_types()
+            else:
+                unregister_file_types()
+        except (OSError, RuntimeError) as exc:
+            QMessageBox.warning(self, APP_NAME, f"Could not change the .rtpl file type:\n{exc}")
+        self.refresh_file_types_action()
+        if checked and not self.file_types_action.isChecked() and sys.platform == "win32":
+            QMessageBox.information(
+                self, APP_NAME,
+                "Another app was chosen for .rtpl files with \"Open with\", and only you can\n"
+                "change that: right-click a .rtpl file, choose Open with, Choose another\n"
+                f"app, pick {APP_NAME} and tick Always use this app.")
 
     def open_file(self, path: Path) -> None:
         """Open a profile or a plan; a plan file is recognized by its "profile" section."""

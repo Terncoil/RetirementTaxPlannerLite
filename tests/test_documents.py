@@ -65,3 +65,104 @@ def test_windows_registry_values():
     # From source the command runs Python with the module, then the file.
     cmd = shortcut.windows_open_command(r"C:\venv\pythonw.exe", ["-m", "rtpl.app"])
     assert cmd == r'"C:\venv\pythonw.exe" "-m" "rtpl.app" "%1"'
+
+
+class FakeWinreg:
+    """Just enough of winreg, keyed by path under HKEY_CURRENT_USER."""
+
+    HKEY_CURRENT_USER = "HKCU"
+    REG_SZ = 1
+    KEY_SET_VALUE = 2
+
+    def __init__(self):
+        self.keys: dict[str, dict[str, str]] = {}
+
+    class _Handle:
+        def __init__(self, values):
+            self.values = values
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    def CreateKey(self, root, key):
+        parts = key.split("\\")
+        for i in range(1, len(parts) + 1):
+            self.keys.setdefault("\\".join(parts[:i]).lower(), {})
+        return self._Handle(self.keys[key.lower()])
+
+    def OpenKey(self, root, key, *_):
+        if key.lower() not in self.keys:
+            raise FileNotFoundError(key)
+        return self._Handle(self.keys[key.lower()])
+
+    def SetValueEx(self, handle, name, _reserved, _type, value):
+        handle.values[name] = value
+
+    def QueryValueEx(self, handle, name):
+        if name not in handle.values:
+            raise FileNotFoundError(name)
+        return handle.values[name], self.REG_SZ
+
+    def DeleteValue(self, handle, name):
+        handle.values.pop(name, None)
+
+    def DeleteKey(self, root, key):
+        key = key.lower()
+        if key not in self.keys:
+            raise FileNotFoundError(key)
+        if any(k.startswith(key + "\\") for k in self.keys):
+            raise PermissionError("has subkeys")
+        del self.keys[key]
+
+
+def test_windows_register_reads_state_and_unregisters():
+    reg = FakeWinreg()
+    assert not shortcut.windows_registered(reg)
+    shortcut.register_windows(reg)
+    assert shortcut.windows_registered(reg)
+    # Another copy of the app (moved folder) registered: this copy is not ticked.
+    command_key = r"Software\Classes\RetirementTaxPlannerLite.rtpl\shell\open\command"
+    with reg.OpenKey(reg.HKEY_CURRENT_USER, command_key) as handle:
+        real = handle.values[""]
+        handle.values[""] = r'"D:\Old\RetirementTaxPlannerLite.exe" "%1"'
+    assert not shortcut.windows_registered(reg)
+    with reg.OpenKey(reg.HKEY_CURRENT_USER, command_key) as handle:
+        handle.values[""] = real
+    # The user picked another app with Open with > Always: Explorer uses that.
+    choice = shortcut.USER_CHOICE.format(suffix=".rtpl")
+    with reg.CreateKey(reg.HKEY_CURRENT_USER, choice) as handle:
+        handle.values["ProgId"] = "Applications\\notepad.exe"
+    assert not shortcut.windows_registered(reg)
+    reg.keys = {k: v for k, v in reg.keys.items() if "fileexts" not in k}
+    shortcut.unregister_windows(reg)
+    assert not shortcut.windows_registered(reg)
+    assert not any("retirementtaxplannerlite.rtpl" in k for k in reg.keys)
+    assert r"software\classes\.rtpl" not in reg.keys
+
+
+def test_unregister_windows_leaves_another_apps_rtpl_key():
+    reg = FakeWinreg()
+    with reg.CreateKey(reg.HKEY_CURRENT_USER, r"Software\Classes\.rtpl") as handle:
+        handle.values[""] = "SomeOtherApp.rtpl"
+    shortcut.unregister_windows(reg)
+    assert reg.keys[r"software\classes\.rtpl"][""] == "SomeOtherApp.rtpl"
+
+
+def test_linux_register_reads_state_and_unregisters(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "share"))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(shortcut, "_run_if_present", lambda *cmd: None)
+    default = {"app": "rtpl.desktop"}
+    monkeypatch.setattr(shortcut, "_xdg_default", lambda mime: default["app"])
+    assert not shortcut.linux_registered()
+    shortcut.make_linux(on_desktop=False)
+    assert shortcut.linux_registered()
+    default["app"] = "org.gnome.TextEditor.desktop"  # user chose another app
+    assert not shortcut.linux_registered()
+    default["app"] = "rtpl.desktop"
+    shortcut.unregister_linux()
+    assert not shortcut.linux_registered()
+    assert (tmp_path / "share" / "applications" / "rtpl.desktop").exists()  # menu entry stays

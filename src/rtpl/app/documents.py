@@ -9,7 +9,7 @@ The packaging files register the types in ``DOCUMENT_TYPES`` with each OS so
 that double-clicking a file starts the app with its path on the command line
 (Windows, Linux) or sends it a file-open event (macOS):
 
-* Windows: ``rtpl-shortcut`` or Help > Open .rtpl Files With This App
+* Windows: ``rtpl-shortcut`` or View > Open .rtpl Files With This App
   (``register_windows`` in ``rtpl.app.shortcut``).
 * macOS: ``CFBundleDocumentTypes`` in ``packaging/rtpl.spec``.
 * Linux: ``packaging/linux/rtpl-mime.xml`` and the ``MimeType`` line of

@@ -105,7 +105,7 @@ earlier versions still open, and their first **Save As** offers the
 `.rtpl` name. Double-clicking a `.rtpl` file opens it in the app once the
 file type is registered: the macOS app does that itself,
 `sh packaging/linux/install.sh` does it for a Linux build, and on Windows
-(or when running from source) use **Help > Open .rtpl Files With This App**
+(or when running from source) use **View > Open .rtpl Files With This App** (a checked item that shows whether this copy opens `.rtpl` files; untick to undo)
 or `uv run rtpl-shortcut`. The app also opens a file named on its command
 line, such as `uv run rtpl "Smith plan.rtpl"`.
 

@@ -61,7 +61,7 @@ and Linux, and as a file-open event on macOS. Registration:
 
 | OS | How `.rtpl` gets registered |
 | --- | --- |
-| Windows | **Help > Open .rtpl Files With This App**, or `uv run rtpl-shortcut` from source. Both write per-user keys under `HKCU\Software\Classes` (no administrator rights) pointing at the copy of the app they run from; do it again after moving the app. A future installer can write the same keys. |
+| Windows | **View > Open .rtpl Files With This App** (a checked item that shows whether this copy opens `.rtpl` files; untick to undo), or `uv run rtpl-shortcut` from source. Both write per-user keys under `HKCU\Software\Classes` (no administrator rights) pointing at the copy of the app they run from; do it again after moving the app. A future installer can write the same keys. |
 | macOS | `packaging/rtpl.spec` adds `CFBundleDocumentTypes` and `UTExportedTypeDeclarations` to the bundle's Info.plist; Finder picks them up when the app is in Applications. |
 | Linux | `packaging/linux/install.sh` installs `packaging/linux/rtpl-mime.xml` (MIME type `application/x-rtpl`), the `.desktop` file with its `MimeType` line and `%f`, and makes the app the default with `xdg-mime`. From source, `uv run rtpl-shortcut` or the Help menu item does the same. |
 

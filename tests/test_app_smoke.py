@@ -650,3 +650,25 @@ def test_macos_file_open_event_reaches_the_window(window, monkeypatch):
     fake = type("App", (), {"router": DocumentRouter(window), "pending": []})()
     cls.event(fake, QFileOpenEvent("/tmp/x.rtpl"))
     assert opened == [Path("/tmp/x.rtpl")]
+
+
+def test_file_types_item_is_checked_from_the_os(window, monkeypatch):
+    """View > Open .rtpl Files With This App shows and changes the OS state."""
+    from rtpl.app import main_window as mw
+
+    action = window.file_types_action
+    assert action is not None and action.isCheckable()  # Linux and Windows
+    state = {"on": False}
+    monkeypatch.setattr(mw, "file_types_registered", lambda: state["on"])
+    monkeypatch.setattr(mw, "register_file_types", lambda: state.update(on=True))
+    monkeypatch.setattr(mw, "unregister_file_types", lambda: state.update(on=False))
+    window.refresh_file_types_action()
+    assert not action.isChecked()
+    action.trigger()
+    assert state["on"] and action.isChecked()
+    state["on"] = False  # changed outside the app: re-read when the menu opens
+    window.refresh_file_types_action()
+    assert not action.isChecked()
+    action.trigger()
+    action.trigger()
+    assert not state["on"] and not action.isChecked()
