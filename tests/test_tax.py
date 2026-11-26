@@ -142,9 +142,10 @@ def test_washington_taxes_only_large_long_term_gains(lib):
     law = lib.federal(2026)
     p = make(state="WA", people=[Person(birth_year=1958, ira_distributions=500_000)], qualified_dividends=50_000)
     assert compute_tax(p, law, wa).state_tax == 0  # wages, IRA and dividends untaxed
-    gains = make(state="WA", long_term_capital_gains=378_000)
+    ded = wa.gains_only_deduction  # read from the year's file
+    gains = make(state="WA", long_term_capital_gains=ded + 100_000)
     assert compute_tax(gains, law, wa).state_tax == pytest.approx(0.07 * 100_000)
-    big = make(state="WA", long_term_capital_gains=1_478_000)
+    big = make(state="WA", long_term_capital_gains=ded + 1_200_000)
     assert compute_tax(big, law, wa).state_tax == pytest.approx(0.07 * 1_000_000 + 0.099 * 200_000)
 
 
@@ -192,7 +193,8 @@ def test_every_state_loads_and_computes(lib):
 
 def test_separate_gains_taxes_are_reported_apart(lib):
     law = lib.federal(2026)
-    wa = compute_tax(make(state="WA", long_term_capital_gains=378_000), law, lib.state("WA"))
+    gains = lib.state("WA").gains_only_deduction + 100_000
+    wa = compute_tax(make(state="WA", long_term_capital_gains=gains), law, lib.state("WA"))
     assert wa.state_gains_tax == wa.state_tax == pytest.approx(7_000)
     ca = compute_tax(make(state="CA", long_term_capital_gains=100_000), law, lib.state("CA"))
     assert ca.state_gains_tax == 0 and ca.state_tax > 0  # CA taxes gains as regular income

@@ -472,6 +472,61 @@ class SocialSecurityRule:
 
 
 @dataclass(frozen=True)
+class InvestmentIncomeTax:
+    """A tax on interest and dividends only (NH's I&D tax, TN's Hall tax).
+
+    ``income`` names what is taxed: ``interest`` (taxable interest),
+    ``tax_exempt_interest`` (federally exempt interest, such as another
+    state's municipal bonds) and ``dividends`` (qualified and not).
+    """
+
+    name: str
+    rate: float
+    income: tuple[str, ...]
+    exemption: dict[str, float]
+    # Added to the exemption for each person this age or older, and for
+    # each blind person (NH: $1,200 a box).
+    extra_exemption: float = 0.0
+    extra_exemption_age: int | None = None
+    extra_exemption_blind: bool = False
+    # The return owes nothing when someone on it is this age or older and
+    # total income from all sources (Social Security included, losses not
+    # subtracted) is at most the limit (TN).
+    exempt_from_age: int | None = None
+    exempt_if_total_income_at_most: dict[str, float] | None = None
+    # A blind person's share of the income and exemption is exempt (TN).
+    blind_exempt: bool = False
+
+
+INVESTMENT_INCOME_KINDS = ("interest", "tax_exempt_interest", "dividends")
+
+
+def _parse_investment_tax(raw: dict | None) -> InvestmentIncomeTax | None:
+    if not raw:
+        return None
+    income = tuple(raw.get("income", ("interest", "dividends")))
+    bad = set(income) - set(INVESTMENT_INCOME_KINDS)
+    if bad:
+        raise ValueError(f"investment_income_tax income has unknown kinds: {', '.join(sorted(bad))}")
+    extra = raw.get("extra_exemption", {})
+    return InvestmentIncomeTax(
+        name=str(raw.get("name", "Investment income tax")),
+        rate=float(raw["rate"]),
+        income=income,
+        exemption=_status_table(raw.get("exemption")),
+        extra_exemption=float(extra.get("amount", 0.0)),
+        extra_exemption_age=extra.get("min_age"),
+        extra_exemption_blind=bool(extra.get("blind", False)),
+        exempt_from_age=raw.get("exempt_from_age"),
+        exempt_if_total_income_at_most=(
+            _status_table(raw["exempt_if_total_income_at_most"])
+            if "exempt_if_total_income_at_most" in raw else None
+        ),
+        blind_exempt=bool(raw.get("blind_exempt", False)),
+    )
+
+
+@dataclass(frozen=True)
 class StateLaw:
     code: str
     name: str
@@ -499,6 +554,7 @@ class StateLaw:
     gains_only_tax: Schedule | None = None  # e.g. Washington: tax on long-term gains only
     gains_only_deduction: float = 0.0
     gains_rates: dict[str, Schedule] | None = None  # separate stacked rates for long-term gains (MT)
+    investment_income_tax: InvestmentIncomeTax | None = None  # interest and dividends only (NH, TN)
     notes: tuple[str, ...] = ()
     # Footnotes for the marginal graph where the file approximates the law
     # (a smoothed phase-out, say). Remove one when the file gets the exact rule.
@@ -515,6 +571,24 @@ class StateLaw:
     @property
     def gains_label(self) -> str:
         return f"State CG&QD Tax ({self.code})"
+
+    @property
+    def taxes_investment_income(self) -> bool:
+        """A tax on interest and dividends only, such as NH's or TN's."""
+        return self.investment_income_tax is not None
+
+    @property
+    def has_any_tax(self) -> bool:
+        """The state taxes some kind of income this year: wages and
+        retirement income, long-term gains only (WA) or interest and
+        dividends only (NH to 2024, TN in 2020)."""
+        return self.has_income_tax or self.gains_only_tax is not None or self.taxes_investment_income
+
+    @property
+    def has_state_layer(self) -> bool:
+        """Some of the tax goes in the State Tax layer of the marginal graph
+        (all of it but a gains-only tax or the state's own gains rules)."""
+        return self.has_income_tax or self.taxes_investment_income
 
     @property
     def has_separate_gains_tax(self) -> bool:
@@ -628,18 +702,20 @@ def _parse_state(raw: dict) -> StateLaw:
             {k: Schedule.from_pairs(raw["capital_gains_rates"].get(k, raw["capital_gains_rates"]["single"] if k != "mfj" else raw["capital_gains_rates"]["mfj"])) for k in FILING_STATUSES}
             if "capital_gains_rates" in raw else None
         ),
+        investment_income_tax=_parse_investment_tax(raw.get("investment_income_tax")),
         notes=tuple(raw.get("notes", ())),
         chart_notes=tuple(raw.get("chart_notes", ())),
         sources=tuple(raw.get("sources", ())),
     )
 
 
-def _no_tax_state(code: str) -> StateLaw:
+def _no_tax_state(code: str, year: int | None = None, notes: tuple[str, ...] = ()) -> StateLaw:
     zero = Schedule.from_pairs([[0, 0.0]])
     return StateLaw(
         code=code,
         name=code,
-        year=None,
+        year=year,
+        notes=notes,
         taxes_social_security=False,
         brackets={k: zero for k in FILING_STATUSES},
         standard_deduction={k: 0.0 for k in FILING_STATUSES},
@@ -803,12 +879,25 @@ class TaxLawLibrary:
                     codes.update(p.stem.upper() for p in ydir.glob("*.toml") if not p.stem.startswith("_"))
         return sorted(codes | set(self._no_tax_codes()))
 
-    def _no_tax_codes(self) -> list[str]:
+    def _no_tax_file(self) -> dict:
         p = self._first_existing("states/_no_income_tax.toml")
         if not p:
-            return []
+            return {}
         with p.open("rb") as fh:
-            return [c.upper() for c in tomllib.load(fh).get("codes", [])]
+            return tomllib.load(fh)
+
+    def _no_tax_codes(self) -> list[str]:
+        return [c.upper() for c in self._no_tax_file().get("codes", [])]
+
+    def no_tax_from(self, code: str) -> int | None:
+        """First tax year with no state tax at all, for a state in the
+        no-tax list whose year files cover the years it still taxed some
+        income (NH's interest and dividends tax ended after 2024)."""
+        code = code.upper()
+        if code not in self._no_tax_codes():
+            return None
+        table = {k.upper(): int(v) for k, v in self._no_tax_file().get("no_tax_from", {}).items()}
+        return table.get(code)
 
     def state_years(self, code: str) -> dict[int, Path]:
         """Files for one state by tax year, user folders winning over shipped ones."""
@@ -852,6 +941,11 @@ class TaxLawLibrary:
             if code in self._no_tax_codes():
                 return _no_tax_state(code)
             raise KeyError(f"No state tax data for {code}")
+        ended = self.no_tax_from(code)
+        if ended is not None and (year is None or year >= ended):
+            return _no_tax_state(
+                code, year, (f"No state tax from {ended}; earlier years have their own law files.",)
+            )
         years = list(files)
         if year is None or year >= years[-1]:
             used = years[-1]
@@ -867,7 +961,7 @@ class TaxLawLibrary:
             raise ValueError(f"{files[used]} says year {raw['year']} but is in the {used} folder")
         raw["year"] = used
         law = _parse_state(raw)
-        if year is not None and year != used and law.has_income_tax:
+        if year is not None and year != used and law.has_any_tax:
             from dataclasses import replace
 
             note = f"{year} uses the {used} state tax law (the newest earlier law on file)." if used < year \

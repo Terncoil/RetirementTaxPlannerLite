@@ -346,6 +346,7 @@ def compute_tax(
         state_income, state_gains_tax = state_income_tax(
             profile, state, agi=agi, taxable_ss=taxable_ss, net_ltcg=ltcg, extra_ira=add_ord,
             federal_deduction=chosen, tax_exempt_interest=h.tax_exempt_interest,
+            extra_qd=add_qd, extra_ltcg=add_lt,
         )
         state_tax = state_income + state_gains_tax
 

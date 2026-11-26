@@ -1,0 +1,24 @@
+# New Hampshire, 2023: no tax on wages or retirement income. The interest
+# and dividends tax (4%) applies to interest and dividends only.
+
+code = "NH"
+name = "New Hampshire"
+year = 2023
+sources = [
+  "NH Dept. of Revenue Administration, Interest & Dividends Tax FAQ and DP-10 instructions (RSA 77)",
+]
+has_income_tax = false
+taxes_social_security = false
+notes = [
+  "The Interest and Dividends Tax is 4% of interest and dividends above the exemption; wages, retirement income and capital gains are not taxed.",
+  "Exemption: $2,400, or $4,800 on a joint return, plus $1,200 for each person 65 or older and $1,200 for each blind person.",
+  "Federally tax-exempt interest (other states' municipal bonds) is taxable. Interest on U.S. obligations and NH municipal bonds is exempt, but the profile can't tell it apart, so all interest counts.",
+  "The $1,200 exemption for a disabled person under 65 is not modelled.",
+]
+
+[investment_income_tax]
+name = "Interest and Dividends Tax"
+rate = 0.04
+income = ["interest", "tax_exempt_interest", "dividends"]
+exemption = { single = 2400, mfj = 4800 }
+extra_exemption = { amount = 1200, min_age = 65, blind = true }

@@ -797,7 +797,7 @@ class MainWindow(QMainWindow):
         state_cb.setText(self.series.state.label if self.series.state else "State tax")
         state_cb.setEnabled(self.series.state is not None)
         st = self.series.state
-        state_cb.setEnabled(st is not None and st.has_income_tax)
+        state_cb.setEnabled(st is not None and st.has_state_layer)
         cg_cb = self.checks["state_cg"]
         cg_cb.setText(st.gains_label if st else "State CG & QD tax")
         cg_cb.setEnabled(st is not None and st.has_separate_gains_tax)

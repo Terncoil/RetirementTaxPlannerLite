@@ -1,3 +1,10 @@
 # States with no broad personal income tax on wages and retirement income.
 # Washington has its own file (capital gains excise tax only).
 codes = ["AK", "FL", "NV", "NH", "SD", "TN", "TX", "WY"]
+
+# States above that taxed interest and dividends in earlier years. Those
+# years have their own files (states/<year>/XX.toml); from the year given
+# here on, the state has no tax at all.
+[no_tax_from]
+NH = 2025  # Interest and Dividends Tax repealed for periods after 2024
+TN = 2021  # Hall income tax repealed from January 1, 2021

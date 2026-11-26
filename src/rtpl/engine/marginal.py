@@ -546,7 +546,7 @@ def default_visibility(series: MarginalSeries) -> dict[str, bool]:
         or p.household.has_taxable_brokerage
     )
     st = series.state
-    vis["state"] = st is not None and st.has_income_tax
+    vis["state"] = st is not None and st.has_state_layer
     vis["state_cg"] = st is not None and st.has_separate_gains_tax and (
         "state_cg" in active
         or series.source is not IncomeSource.ORDINARY

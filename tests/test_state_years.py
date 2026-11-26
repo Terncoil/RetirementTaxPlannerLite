@@ -33,11 +33,12 @@ def test_year_without_a_file_uses_the_nearest_law(lib):
     assert any("uses the" in n for n in later.chart_notes)
     earlier = lib.state("MI", 2019)
     assert earlier.year == 2020 and any("no earlier law" in n for n in earlier.chart_notes)
-    # Every state with an income tax has a file for each year from 2020.
+    # Every state with an income tax has a file for each year from 2020,
+    # or up to the year its last tax ended (NH, TN).
     for code in lib.available_states():
         years = lib.state_years(code)
         if years:
-            assert set(range(2020, 2027)) <= set(years), code
+            assert set(range(2020, lib.no_tax_from(code) or 2027)) <= set(years), code
 
 
 def test_user_files_override_by_year_and_undated(tmp_path):
@@ -152,3 +153,88 @@ def test_retirement_exclusions_change_by_year(lib):
     # Washington's capital gains tax starts in 2022.
     assert lib.state("WA", 2021).gains_only_tax is None
     assert lib.state("WA", 2022).gains_only_deduction == 250_000
+
+
+# -- taxes on interest and dividends only (NH, TN) and WA by year ------------
+
+
+def _state_tax(lib, code, year, fs="single", people=None, **household):
+    p = make(year=year, fs=fs, state=code, people=people or [Person(birth_year=1980)], **household)
+    return compute_tax(p, lib.federal(year), lib.state(code, year))
+
+
+def test_new_hampshire_interest_and_dividends_tax_by_year(lib):
+    years = lib.state_years("NH")
+    assert list(years) == [2020, 2021, 2022, 2023, 2024] and lib.no_tax_from("NH") == 2025
+    for year in years:
+        st = lib.state("NH", year)
+        assert not st.has_income_tax and st.taxes_investment_income and st.has_any_tax
+        assert st.has_state_layer and not st.has_separate_gains_tax
+        tax = st.investment_income_tax
+        ex = tax.exemption["single"]
+        r = _state_tax(lib, "NH", year, taxable_interest=4_000, qualified_dividends=3_000,
+                       nonqualified_dividends=1_000, tax_exempt_interest=2_000,
+                       long_term_capital_gains=50_000, people=[Person(birth_year=1980, wages=200_000)])
+        assert r.state_tax == pytest.approx(tax.rate * (10_000 - ex))
+        assert r.state_gains_tax == 0
+    assert [lib.state("NH", y).investment_income_tax.rate for y in years] == [0.05, 0.05, 0.05, 0.04, 0.03]
+    # Joint: $4,800 plus $1,200 for each person 65+ and each blind person.
+    st = lib.state("NH", 2022)
+    people = [Person(birth_year=1950, blind=True), Person(birth_year=1970)]
+    r = _state_tax(lib, "NH", 2022, fs="mfj", people=people, taxable_interest=20_000)
+    tax = st.investment_income_tax
+    assert r.state_tax == pytest.approx(tax.rate * (20_000 - tax.exemption["mfj"] - 2 * tax.extra_exemption))
+    # Repealed from 2025: no tax at all, also for years after.
+    for year in (2025, 2026, 2030, None):
+        st = lib.state("NH", year)
+        assert not st.has_any_tax and st.investment_income_tax is None
+    assert _state_tax(lib, "NH", 2025, taxable_interest=100_000).state_tax == 0
+
+
+def test_tennessee_hall_tax_2020_only(lib):
+    assert list(lib.state_years("TN")) == [2020] and lib.no_tax_from("TN") == 2021
+    st = lib.state("TN", 2020)
+    tax = st.investment_income_tax
+    assert tax.rate == 0.01 and st.has_any_tax
+    # Dividends and out-of-state municipal interest are taxed; bank interest is not.
+    r = _state_tax(lib, "TN", 2020, qualified_dividends=8_000, tax_exempt_interest=2_000,
+                   taxable_interest=50_000, people=[Person(birth_year=1980, wages=100_000)])
+    assert r.state_tax == pytest.approx(0.01 * (10_000 - tax.exemption["single"]))
+    # 65 or older: no tax at or below the total-income limit, the full tax above it.
+    limit = tax.exempt_if_total_income_at_most["single"]
+    old = [Person(birth_year=1950, social_security=limit - 10_000)]
+    assert _state_tax(lib, "TN", 2020, people=old, qualified_dividends=10_000).state_tax == 0
+    assert _state_tax(lib, "TN", 2020, people=old, qualified_dividends=10_001).state_tax == pytest.approx(
+        0.01 * (10_001 - tax.exemption["single"]))
+    # A blind spouse's half is exempt, with half the joint exemption.
+    people = [Person(birth_year=1980, blind=True, wages=100_000), Person(birth_year=1980)]
+    r = _state_tax(lib, "TN", 2020, fs="mfj", people=people, qualified_dividends=20_000)
+    assert r.state_tax == pytest.approx(0.01 * (10_000 - tax.exemption["mfj"] / 2))
+    for year in (2021, 2025, None):
+        assert not lib.state("TN", year).has_any_tax
+    assert _state_tax(lib, "TN", 2021, qualified_dividends=100_000).state_tax == 0
+
+
+def test_state_layer_and_cliff_for_investment_only_taxes(lib):
+    from rtpl.engine.marginal import default_visibility
+    from rtpl.engine.tax import IncomeSource
+
+    # NH 2024: added dividends are taxed in the State Tax layer at 3%.
+    p = make(year=2024, state="NH", people=[Person(birth_year=1980, wages=60_000)], qualified_dividends=5_000)
+    s = build_marginal_series(p, lib, source=IncomeSource.QUALIFIED_DIVIDENDS, x_max=10_000, step=1_000)
+    assert s.layers["state"][-1] == pytest.approx(0.03)
+    assert default_visibility(s)["state"]
+    # TN 2020, 65+: more IRA income ends the exemption, a cliff in the state layer.
+    p = make(year=2020, state="TN", people=[Person(birth_year=1950, social_security=20_000)],
+             qualified_dividends=10_000)
+    s = build_marginal_series(p, lib, x_max=20_000, step=500)
+    cliff = [a for a in s.annotations if a.kind == "state_cliff"]
+    limit = lib.state("TN", 2020).investment_income_tax.exempt_if_total_income_at_most["single"]
+    assert len(cliff) == 1 and cliff[0].x == pytest.approx(limit - 30_000, abs=0.02)
+
+
+def test_washington_deduction_by_year(lib):
+    assert [lib.state("WA", y).gains_only_deduction for y in range(2022, 2027)] == [
+        250_000, 262_000, 270_000, 278_000, 290_000]
+    for year in (2020, 2021):
+        assert not lib.state("WA", year).has_any_tax

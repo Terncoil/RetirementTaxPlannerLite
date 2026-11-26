@@ -1,0 +1,27 @@
+# Tennessee, 2020: no tax on wages or retirement income. The Hall income
+# tax (1% in its last year) applies to dividends and some interest.
+
+code = "TN"
+name = "Tennessee"
+year = 2020
+sources = [
+  "TN Dept. of Revenue, Hall Income Tax: Due Date and Tax Rates; Exemptions and Deductions; Hall Income Tax Manual (March 2021)",
+]
+has_income_tax = false
+taxes_social_security = false
+notes = [
+  "The Hall income tax is 1% of dividends and bond interest above the exemption ($1,250, or $2,500 on a joint return). It is repealed from 2021.",
+  "Interest on bank accounts, CDs, credit unions and U.S. obligations is exempt, so the profile's taxable interest is not taxed. Interest on corporate bonds and notes is taxable but not modelled.",
+  "Federally tax-exempt interest (other states' municipal bonds) is taxable. Mutual fund capital gain distributions are taxable but are counted as gains here and not taxed.",
+  "No tax when someone on the return is 65 or older and total income from all sources, Social Security included, is at most $37,000 ($68,000 joint).",
+  "A blind person's share is exempt. The exemption at age 100 is not modelled.",
+]
+
+[investment_income_tax]
+name = "Hall income tax"
+rate = 0.01
+income = ["tax_exempt_interest", "dividends"]
+exemption = { single = 1250, mfj = 2500 }
+exempt_from_age = 65
+exempt_if_total_income_at_most = { single = 37000, mfj = 68000 }
+blind_exempt = true
