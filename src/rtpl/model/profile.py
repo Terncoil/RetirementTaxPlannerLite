@@ -81,6 +81,10 @@ class Household:
     # add them back.
     hsa_deduction: float = 0.0
     itemized_deductions: float = 0.0  # 0 = take the standard deduction
+    # Cash gifts to charity this year. From 2026, those who take the
+    # standard deduction also deduct them up to a cap ($1,000, or $2,000
+    # married filing jointly); itemizers count them in itemized_deductions.
+    charitable_cash_gifts: float = 0.0
     has_taxable_brokerage: bool = False
     aca_marketplace: bool = False  # someone buys ACA marketplace coverage
     # Metal tier of the plan bought on the marketplace: cost-sharing

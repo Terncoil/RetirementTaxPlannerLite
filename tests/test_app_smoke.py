@@ -484,6 +484,13 @@ def test_aca_and_education_fields_round_trip(window, tmp_path):
     assert window.form.education_last.text() == "This year only"
 
 
+
+def test_charitable_gifts_field(window):
+    box = window.form.household_money["charitable_cash_gifts"]
+    assert "standard deduction" in box.toolTip()
+    box.setValue(1_500)
+    assert window.form.profile().household.charitable_cash_gifts == 1_500
+
 def test_new_profile_defaults(window, monkeypatch):
     """View > New Profile Defaults sets what File > New starts from, kept
     in the settings folder rather than in any profile file."""

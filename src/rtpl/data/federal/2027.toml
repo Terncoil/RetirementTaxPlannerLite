@@ -109,6 +109,16 @@ llc_expense_limit = 10000
 llc_phaseout_start = { single = 80000, mfj = 160000, mfs = 0, hoh = 80000 }
 llc_phaseout_width = { single = 10000, mfj = 20000, mfs = 0, hoh = 10000 }
 
+[charitable]
+# Cash gifts to charity deducted by those who take the standard deduction
+# (IRC 170(p), added by OBBBA for tax years after 2025). The deduction
+# lowers taxable income but not AGI. Cash only, to public charities, not to
+# donor-advised funds or supporting organizations. Fixed in statute, not
+# indexed. A qualifying surviving spouse files no joint return, so takes the
+# single amount.
+nonitemizer_first_year = 2026
+nonitemizer_limit = { single = 1000, mfj = 2000, mfs = 1000, hoh = 1000 }
+
 [qcd]
 # Qualified charitable distributions (IRC 408(d)(8)): the most each IRA
 # owner aged 70 1/2 or older can give from their IRAs tax-free this year.

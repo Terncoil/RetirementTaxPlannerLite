@@ -39,6 +39,7 @@ HOUSEHOLD_MONEY = [
     ("other_investment_income", "Rental / passive income"),
     ("adjustments", "Above-the-line adjustments"),
     ("itemized_deductions", "Itemized deductions"),
+    ("charitable_cash_gifts", "Cash gifts to charity"),
 ]
 
 # Monthly ACA marketplace premiums, per person.
@@ -57,7 +58,16 @@ PERSON_ACA = [
 
 MONEY_TIPS = {
     "social_security": "Yearly Social Security benefit, before Medicare premiums.",
-    "itemized_deductions": "Leave at $0 to use the standard deduction.",
+    "itemized_deductions": (
+        "Leave at $0 to use the standard deduction. If you itemize,\n"
+        "include your charitable gifts here."),
+    "charitable_cash_gifts": (
+        "Cash gifts to charity this year. From 2026, if you take the\n"
+        "standard deduction you can also deduct up to $1,000 of them\n"
+        "($2,000 married filing jointly). It lowers taxable income but not\n"
+        "AGI, so Social Security, IRMAA and ACA amounts don't change. Gifts\n"
+        "to donor-advised funds don't count. State taxes ignore it.\n"
+        "Ignored if you itemize, so include them in itemized deductions."),
     "long_term_capital_gains": "Enter a net loss as a negative amount.",
     "short_term_capital_gains": (
         "Taxed as ordinary income. Enter a net loss as a negative amount.\n"

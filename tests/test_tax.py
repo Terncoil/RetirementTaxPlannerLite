@@ -257,3 +257,63 @@ def test_niit_counts_net_capital_gains_only(lib):
     p = make(people=[Person(birth_year=1980, wages=250_000)],
              short_term_capital_gains=-40_000, long_term_capital_gains=30_000)
     assert compute_tax(p, law).niit == 0
+
+
+@pytest.mark.parametrize(
+    "fs, ages, gifts, expected",
+    [
+        ("single", (40,), 500, 500),
+        ("single", (40,), 5_000, 1_000),
+        ("hoh", (40,), 5_000, 1_000),
+        ("mfs", (40, 40), 5_000, 1_000),
+        ("mfj", (40, 40), 5_000, 2_000),
+        ("qss", (40,), 5_000, 1_000),  # not a joint return
+    ],
+)
+def test_charitable_deduction_for_non_itemizers(lib, fs, ages, gifts, expected):
+    law = lib.federal(2026)
+    base = make(fs=fs, ages=ages, other_ordinary_income=90_000)
+    giving = make(fs=fs, ages=ages, other_ordinary_income=90_000, charitable_cash_gifts=gifts)
+    r0, r = compute_tax(base, law), compute_tax(giving, law)
+    assert r.charitable_deduction == expected
+    assert r.taxable_income == pytest.approx(r0.taxable_income - expected)
+    assert r.deduction == r0.deduction  # the standard deduction itself is unchanged
+
+
+def test_charitable_deduction_leaves_agi_and_magi_alone(lib):
+    # Below the line: no effect on Social Security taxability, IRMAA or
+    # ACA MAGI, the senior deduction's phase-out, or state tax.
+    law = lib.federal(2026)
+    kw = dict(fs="mfj", ages=(68, 66), state="CA", other_ordinary_income=120_000)
+    p0 = make(**kw)
+    p0.people[0].social_security = 30_000
+    p = make(charitable_cash_gifts=3_000, **kw)
+    p.people[0].social_security = 30_000
+    state = lib.state("CA", 2026)
+    r0, r = compute_tax(p0, law, state), compute_tax(p, law, state)
+    for attr in ("agi", "taxable_social_security", "magi_irmaa", "magi_aca", "senior_deduction", "state_tax"):
+        assert getattr(r, attr) == pytest.approx(getattr(r0, attr)), attr
+    assert r.taxable_income == pytest.approx(r0.taxable_income - 2_000)
+
+
+def test_charitable_deduction_starts_in_2026_and_is_not_indexed(lib):
+    p = make(year=2025, other_ordinary_income=90_000, charitable_cash_gifts=5_000)
+    assert compute_tax(p, lib.federal(2025)).charitable_deduction == 0
+    for year in (2027, 2035):
+        law = lib.federal(year)
+        assert law.charitable_nonitemizer_cap("single") == 1_000
+        assert law.charitable_nonitemizer_cap("mfj") == 2_000
+
+
+def test_charitable_deduction_only_with_the_standard_deduction(lib):
+    law = lib.federal(2026)
+    # Itemizing beats the standard deduction plus $1,000: no extra deduction.
+    p = make(other_ordinary_income=90_000, itemized_deductions=20_000, charitable_cash_gifts=5_000)
+    r = compute_tax(p, law)
+    assert r.charitable_deduction == 0 and r.deduction == 20_000
+    # Itemized deductions just above the standard one: the standard
+    # deduction and the charitable deduction together are worth more.
+    p = make(other_ordinary_income=90_000, itemized_deductions=16_500, charitable_cash_gifts=5_000)
+    r = compute_tax(p, law)
+    assert r.deduction == 16_100 and r.charitable_deduction == 1_000
+    assert r.taxable_income == 90_000 - 17_100
