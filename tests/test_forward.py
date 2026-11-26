@@ -1020,3 +1020,29 @@ def test_hsa_rules_validate_and_show_in_the_year_table(lib):
     assert rows[0][header.index("A HSA contribution")] == "5,400"
     header, _ = year_table(run_plan(hsa_plan(prof, []), lib, with_lines=False))
     assert "A HSA contribution" not in header
+
+
+def test_short_term_gain_and_loss_streams_net_with_long_term_gains(lib):
+    prof = single(birth=1960)
+    lives_to(prof, 70)
+    plan = Plan(
+        profile=prof,
+        incomes=[
+            IncomeStream(kind="wages", amount=60_000, owner=0, cola="none"),
+            IncomeStream(kind="ltcg", amount=10_000, owner=0, cola="none"),
+            IncomeStream(kind="stcg", amount=-4_000, owner=0, cola="none", end=When(year=2026)),
+            IncomeStream(kind="stcg", amount=2_000, owner=0, cola="none", start=When(year=2027), end=When(year=2027)),
+            IncomeStream(kind="ltcg", amount=-20_000, owner=0, cola="none", start=When(year=2028), end=When(year=2028)),
+        ],
+        assumptions=Assumptions(cash_return=0.0),  # no interest on the surplus
+    )
+    res = run_plan(plan, lib)
+    y26, y27, y28 = res.years[:3]
+    assert y26.tax.net_ltcg == pytest.approx(6_000)  # the short-term loss offsets the long-term gain
+    assert y26.tax.ordinary_income == pytest.approx(60_000)
+    assert y27.tax.net_ltcg == pytest.approx(10_000)
+    assert y27.tax.ordinary_income == pytest.approx(62_000)  # a short-term gain is ordinary income
+    assert y28.tax.net_ltcg == 0
+    assert y28.tax.ordinary_income == pytest.approx(57_000)  # net loss capped at $3,000
+    # A loss is not shown as negative income.
+    assert all(s.amount > 0 for yr in res.years for s in yr.sources)

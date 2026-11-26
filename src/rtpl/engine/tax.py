@@ -227,6 +227,25 @@ def _standard_deduction(profile: Profile, law: FederalLaw) -> float:
     return law.standard_deduction[fs] + extra_each * boxes
 
 
+def net_capital_gains(stcg: float, ltcg: float, loss_limit: float) -> tuple[float, float]:
+    """Net short- and long-term results as Schedule D does.
+
+    Returns ``(ordinary, ltcg)``: the part taxed (or deducted) as ordinary
+    income and the net long-term gain taxed at capital gains rates. A
+    loss in one term first offsets a gain in the other. A net loss
+    reduces ordinary income by at most ``loss_limit``; the rest would
+    carry over, which is not modeled.
+    """
+    net = stcg + ltcg
+    if net < 0:
+        return max(net, -loss_limit), 0.0
+    if stcg < 0:
+        return 0.0, net  # the short-term loss reduced the long-term gain
+    if ltcg < 0:
+        return net, 0.0  # the long-term loss reduced the short-term gain
+    return stcg, ltcg
+
+
 def compute_tax(
     profile: Profile,
     law: FederalLaw,
@@ -256,15 +275,14 @@ def compute_tax(
         + retirement
         + h.taxable_interest
         + h.nonqualified_dividends
-        + h.short_term_capital_gains
         + h.other_ordinary_income
         + h.other_investment_income
     )
     qd = h.qualified_dividends + add_qd
-    ltcg = h.long_term_capital_gains + add_lt
-    if ltcg < 0:
-        ordinary += max(ltcg, -law.capital_loss_limit[fs])
-        ltcg = 0.0
+    stcg_ordinary, ltcg = net_capital_gains(
+        h.short_term_capital_gains, h.long_term_capital_gains + add_lt, law.capital_loss_limit[fs]
+    )
+    ordinary += stcg_ordinary
 
     ss = profile.total("social_security")
     agi_ex_ss = ordinary + qd + ltcg - h.adjustments - h.hsa_deduction
@@ -292,8 +310,7 @@ def compute_tax(
         h.taxable_interest
         + h.nonqualified_dividends
         + qd
-        + ltcg
-        + max(0.0, h.short_term_capital_gains)
+        + max(0.0, h.short_term_capital_gains + h.long_term_capital_gains + add_lt)
         + h.other_investment_income
     )
     niit = law.niit_rate * max(0.0, min(nii, agi - law.niit_threshold[fs]))

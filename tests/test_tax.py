@@ -203,3 +203,57 @@ def test_separate_gains_taxes_are_reported_apart(lib):
     ordinary_part = base - 30_000
     assert r.state_gains_tax == pytest.approx(0.03 * (47_500 - ordinary_part) + 0.041 * (base - 47_500))
     assert r.state_tax - r.state_gains_tax == pytest.approx(mt.brackets["single"].tax(ordinary_part))
+
+
+# -- capital gains and losses (Schedule D netting) ---------------------------------
+
+
+@pytest.mark.parametrize(
+    "stcg, ltcg, fs, ordinary, net_lt",
+    [
+        (5_000, 10_000, "single", 5_000, 10_000),  # both gains: ST ordinary, LT preferential
+        (-4_000, 10_000, "single", 0, 6_000),  # ST loss reduces the LT gain
+        (-12_000, 10_000, "single", -2_000, 0),  # ST loss beyond the LT gain: net loss under the cap
+        (-20_000, 10_000, "single", -3_000, 0),  # net loss capped at $3,000
+        (8_000, -5_000, "single", 3_000, 0),  # LT loss reduces the ST gain
+        (8_000, -9_000, "single", -1_000, 0),  # LT loss beyond the ST gain
+        (2_000, -30_000, "single", -3_000, 0),
+        (-2_000, -2_000, "single", -3_000, 0),  # both losses: one cap
+        (-1_000, -1_000, "single", -2_000, 0),
+        (-10_000, 0, "mfs", -1_500, 0),  # $1,500 married filing separately
+        (0, -10_000, "mfj", -3_000, 0),
+    ],
+)
+def test_capital_gain_and_loss_netting(lib, stcg, ltcg, fs, ordinary, net_lt):
+    law = lib.federal(2026)
+    wages = 80_000
+    p = make(fs=fs, people=[Person(birth_year=1980, wages=wages)],
+             short_term_capital_gains=stcg, long_term_capital_gains=ltcg)
+    r = compute_tax(p, law)
+    assert r.ordinary_income == pytest.approx(wages + ordinary)
+    assert r.net_ltcg == pytest.approx(net_lt)
+    assert r.agi == pytest.approx(wages + ordinary + net_lt)
+
+
+def test_short_term_loss_absorbs_extra_long_term_gain(lib):
+    # On the marginal graph, a long-term gain added on top of a short-term
+    # loss is first used up by the loss.
+    law = lib.federal(2026)
+    p = make(people=[Person(birth_year=1980, wages=80_000)], short_term_capital_gains=-5_000)
+    assert compute_tax(p, law).agi == 77_000
+    r = compute_tax(p, law, extra=4_000, source=IncomeSource.LTCG)
+    assert r.agi == 79_000 and r.net_ltcg == 0  # a $1,000 net loss is left
+    r = compute_tax(p, law, extra=5_000, source=IncomeSource.LTCG)
+    assert r.agi == 80_000 and r.net_ltcg == 0
+    r = compute_tax(p, law, extra=8_000, source=IncomeSource.LTCG)
+    assert r.agi == 83_000 and r.net_ltcg == 3_000
+
+
+def test_niit_counts_net_capital_gains_only(lib):
+    law = lib.federal(2026)
+    p = make(people=[Person(birth_year=1980, wages=250_000)],
+             short_term_capital_gains=-10_000, long_term_capital_gains=30_000)
+    assert compute_tax(p, law).niit == pytest.approx(0.038 * 20_000)
+    p = make(people=[Person(birth_year=1980, wages=250_000)],
+             short_term_capital_gains=-40_000, long_term_capital_gains=30_000)
+    assert compute_tax(p, law).niit == 0

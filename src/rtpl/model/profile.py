@@ -72,7 +72,7 @@ class Household:
     qualified_dividends: float = 0.0
     nonqualified_dividends: float = 0.0
     long_term_capital_gains: float = 0.0  # net; may be negative
-    short_term_capital_gains: float = 0.0  # taxed as ordinary
+    short_term_capital_gains: float = 0.0  # net; may be negative; taxed as ordinary
     other_ordinary_income: float = 0.0
     other_investment_income: float = 0.0  # rents, royalties, passive (in NIIT)
     adjustments: float = 0.0  # above-the-line deductions (HSA, etc.)

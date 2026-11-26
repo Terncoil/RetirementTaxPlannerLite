@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 
 from rtpl.model.plan import (
     CONTRIBUTION_KINDS,
+    GAIN_INCOME_KINDS,
     HSA_CATCH_UP_AGE,
     HSA_COVERAGE,
     QCD_KINDS,
@@ -253,6 +254,7 @@ class _Year:
     nonqualified_div: float = 0.0
     qualified_div: float = 0.0
     ltcg: float = 0.0
+    stcg: float = 0.0
     other_ordinary: float = 0.0  # includes the taxable part of foreign pensions
     tax_exempt: float = 0.0
     hsa_deduction: float = 0.0  # HSA contributions, an above-the-line deduction
@@ -636,6 +638,7 @@ class PlanEngine:
             qualified_dividends=y.qualified_div,
             nonqualified_dividends=y.nonqualified_div,
             long_term_capital_gains=y.ltcg,
+            short_term_capital_gains=y.stcg,
             other_ordinary_income=y.other_ordinary,
             adjustments=h.adjustments * infl,
             hsa_deduction=y.hsa_deduction,
@@ -826,7 +829,7 @@ class PlanEngine:
             # 3. incomes
             for s in plan.incomes:
                 amt = self.stream_amount(s, year)
-                if amt <= 0:
+                if amt == 0 or (amt < 0 and s.kind not in GAIN_INCOME_KINDS):
                     continue
                 owner = s.owner if s.owner is not None and s.owner < len(profile.people) else None
                 if owner is not None and not self.alive(owner, year):
@@ -850,8 +853,12 @@ class PlanEngine:
                     y.add("qualified_div", owner, taxable)
                     sources.append(Source("dividends", key, label, amt))
                 elif s.kind == "ltcg":
+                    # A loss is not income: it lowers the tax but adds no cash or bar.
                     y.add("ltcg", owner, taxable)
-                    sources.append(Source("realized_gains", key, label, amt))
+                    sources.append(Source("realized_gains", key, label, max(0.0, amt)))
+                elif s.kind == "stcg":
+                    y.add("stcg", owner, taxable)
+                    sources.append(Source("other_ordinary", key, label, max(0.0, amt)))
                 elif s.kind == "tax_exempt":
                     y.add("tax_exempt", owner, amt)
                     sources.append(Source("tax_exempt", key, label, amt))
