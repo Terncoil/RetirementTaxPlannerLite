@@ -47,6 +47,8 @@ ACCOUNT_KINDS = {
     "taxable": "Taxable brokerage",
     "cash": "Cash / savings",
 }
+# Income kinds whose yearly amount may be negative (a capital loss).
+GAIN_INCOME_KINDS = ("ltcg", "stcg")
 TRADITIONAL_KINDS = ("traditional_ira", "401k")
 ROTH_KINDS = ("roth_ira", "roth_401k")
 
@@ -58,6 +60,7 @@ INCOME_KINDS = {
     "interest": "Interest",
     "qualified_dividends": "Qualified dividends",
     "ltcg": "Long-term capital gain",
+    "stcg": "Short-term capital gain",
     "other_ordinary": "Other ordinary income",
     "tax_exempt": "Tax-exempt income",
 }

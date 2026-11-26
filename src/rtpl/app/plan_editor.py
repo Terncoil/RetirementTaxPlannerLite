@@ -51,6 +51,7 @@ from rtpl.model.plan import (
     COLA_INCOME_KINDS,
     COLA_KINDS,
     CONTRIBUTION_KINDS,
+    GAIN_INCOME_KINDS,
     HSA_CATCH_UP_AGE,
     HSA_COVERAGE,
     INCOME_KINDS,
@@ -843,7 +844,7 @@ class IncomeForm(ItemForm):
         for k, label in INCOME_KINDS.items():
             self.kind.addItem(label, k)
         self.owner = self.row("Owner", ComboBox())
-        self.amount = self.row("Yearly amount", money_box(), "In the first year it is paid")
+        self.amount = self.row("Yearly amount", money_box(allow_negative=True), "In the first year it is paid")
         self.start = self.row("Starts", WhenEdit("Plan start", start=True))
         self.end = self.row("Ends (last year paid)", WhenEdit("For life"))
         self.cola = self.row("COLA", ComboBox(), "How the amount rises after the first year it is paid")
@@ -863,6 +864,7 @@ class IncomeForm(ItemForm):
         self.name.setPlaceholderText(INCOME_KINDS.get(s.kind, s.kind))
         self.kind.setCurrentIndex(max(0, self.kind.findData(s.kind)))
         set_items(self.owner, owner_combo(self.plan, True), s.owner)
+        self._set_amount_floor(s.kind)
         self.amount.setValue(s.amount)
         for w, when in ((self.start, s.start), (self.end, s.end)):
             w.set_plan(self.plan)
@@ -886,8 +888,13 @@ class IncomeForm(ItemForm):
         s.survivor_pct = self.survivor.value() / 100
         s.federal_taxable_pct = self.taxable.value() / 100
 
+    def _set_amount_floor(self, kind: str) -> None:
+        """Only a capital gain may be negative (a loss)."""
+        self.amount.setMinimum(-10_000_000 if kind in GAIN_INCOME_KINDS else 0)
+
     def update_rows(self) -> None:
         kind = self.kind.currentData()
+        self._set_amount_floor(kind)
         self.show_row(self.survivor, kind in SURVIVOR_KINDS)
         # Wages, pensions and annuities have a COLA; other income a yearly increase.
         word = "COLA" if kind in COLA_INCOME_KINDS else "Yearly increase"

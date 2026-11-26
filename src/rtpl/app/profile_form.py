@@ -34,7 +34,7 @@ HOUSEHOLD_MONEY = [
     ("qualified_dividends", "Qualified dividends"),
     ("nonqualified_dividends", "Non-qualified dividends"),
     ("long_term_capital_gains", "Net long-term capital gains"),
-    ("short_term_capital_gains", "Short-term capital gains"),
+    ("short_term_capital_gains", "Net short-term capital gains"),
     ("other_ordinary_income", "Other ordinary income"),
     ("other_investment_income", "Rental / passive income"),
     ("adjustments", "Above-the-line adjustments"),
@@ -58,7 +58,16 @@ PERSON_ACA = [
 MONEY_TIPS = {
     "social_security": "Yearly Social Security benefit, before Medicare premiums.",
     "itemized_deductions": "Leave at $0 to use the standard deduction.",
+    "long_term_capital_gains": "Enter a net loss as a negative amount.",
+    "short_term_capital_gains": (
+        "Taxed as ordinary income. Enter a net loss as a negative amount.\n"
+        "A loss first offsets the other term's gains; at most $3,000\n"
+        "($1,500 married filing separately) of a net loss reduces other\n"
+        "income. Carrying the rest to later years is not modeled."),
 }
+
+# Gains that may be entered as a loss.
+GAIN_KEYS = ("long_term_capital_gains", "short_term_capital_gains")
 
 # Widest a number field needs to be: "$10,000,000" plus the arrows.
 FIELD_WIDTH = 124
@@ -235,7 +244,7 @@ class ProfileForm(QWidget):
         hform = compact_form(QFormLayout(hh))
         self.household_money: dict[str, DoubleSpinBox] = {}
         for key, text in HOUSEHOLD_MONEY:
-            box = money_box(allow_negative=key == "long_term_capital_gains")
+            box = money_box(allow_negative=key in GAIN_KEYS)
             self.household_money[key] = box
             _add_row(hform, text, box, MONEY_TIPS.get(key))
             box.valueChanged.connect(self._emit)

@@ -624,3 +624,27 @@ def test_balance_label_follows_the_baseline_year(window):
     window._timer.timeout.emit()
     assert plan.start_year == year + 1
     assert label.text() == f"Balance on Jan 1, {year + 1}"
+
+
+def test_only_capital_gain_incomes_can_be_negative(window):
+    ed = window.plan_editor
+    plan = window.plan_view.plan
+    stream = plan.incomes[1]
+    pick(ed, stream)
+    form = ed.forms["incomes"]
+    assert form.amount.minimum() == 0
+    form.kind.setCurrentIndex(form.kind.findData("stcg"))
+    assert stream.kind == "stcg" and form.amount.minimum() < 0
+    form.amount.setValue(-5_000)
+    assert stream.amount == -5_000
+    form.kind.setCurrentIndex(form.kind.findData("ltcg"))
+    assert stream.amount == -5_000
+    form.kind.setCurrentIndex(form.kind.findData("wages"))
+    assert form.amount.minimum() == 0 and stream.amount == 0
+
+
+def test_baseline_allows_negative_short_term_gains(window):
+    box = window.form.household_money["short_term_capital_gains"]
+    assert box.minimum() < 0
+    box.setValue(-2_000)
+    assert window.form.household_money["long_term_capital_gains"].minimum() < 0
