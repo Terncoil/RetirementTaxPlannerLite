@@ -85,12 +85,13 @@ people can try it with File > Open. It runs:
 * **On every push to `main`** (so after each merged pull request). The zips
   are on that run's page in the Actions tab, under *Artifacts*, for 30 days.
   You must be signed in to GitHub to download them.
-* **Releases happen by themselves.** When a push to `main` carries a version
+* **Releases happen by themselves when switched on.** When the repository
+  variable `AUTO_RELEASE` is `true` and a push to `main` carries a version
   that has no release yet, the workflow also tags that commit `v<version>`
   and publishes a GitHub Release with the three zips and notes listing the
   merged pull requests. Releases stay for good, and anyone who can see the
   repository can download them. Because every app change raises the version,
-  every merged app change becomes a release.
+  every merged app change then becomes a release.
 * On pull requests that change packaging, app code or the examples, and by hand
   (Actions tab, "build apps", "Run workflow"): builds only, no release.
 
@@ -114,6 +115,20 @@ the allowance, so once the repository is public you can set
 Other savings: draft pull requests skip the app builds (they run once
 the pull request is marked ready), and a new push to a pull request
 cancels its unfinished runs.
+
+### Automatic releases are off for now
+
+While a larger feature (such as the Estimated Quarterly Tax Assistant) is
+merged in parts, pushes to `main` build only and publish no release, so no
+half-finished version goes out as a download. Pull requests still raise
+the version as usual; the builds are on each run's page as above.
+
+* **Switch automatic releases on:** Settings, *Secrets and variables*,
+  *Actions*, *Variables* tab, *New repository variable*: name
+  `AUTO_RELEASE`, value `true`. The next push to `main` whose version has
+  no release yet publishes one. Delete it or set it to `false` to switch
+  them off again.
+* **One release while they are off:** push the tag `v<version>` (below).
 
 You can also push a tag `v<version>` yourself, or make a release by hand on
 GitHub; the tag must match `__version__`, and the workflow attaches the zips.
