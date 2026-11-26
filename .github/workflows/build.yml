@@ -4,8 +4,10 @@ name: build apps
 # starts and carries the right version, and uploads it as a download.
 #
 # * Every push to main: fresh builds on the run's page (kept 30 days). If
-#   the version in src/rtpl/__init__.py has no release yet, the builds are
-#   also published as GitHub Release v<version>, which stays for good.
+#   the repository variable AUTO_RELEASE is true and the version in
+#   src/rtpl/__init__.py has no release yet, the builds are also published
+#   as GitHub Release v<version>, which stays for good. AUTO_RELEASE unset
+#   or false = builds only (for example while a feature is half done).
 # * A tag v<version> pushed by hand: the same release, for that commit.
 # * Pull requests that touch packaging (not while they are drafts), and
 #   "Run workflow" by hand.
@@ -57,6 +59,7 @@ jobs:
       - id: v
         env:
           GH_TOKEN: ${{ github.token }}
+          AUTO_RELEASE: ${{ vars.AUTO_RELEASE }}
         run: |
           version=$(python3 packaging/version.py)
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -68,7 +71,9 @@ jobs:
             fi
             release=true
           elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF" = refs/heads/main ]; then
-            if gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            if [ "$AUTO_RELEASE" != true ]; then
+              echo "Automatic releases are off (repository variable AUTO_RELEASE is not true); builds only."
+            elif gh release view "v$version" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
               echo "Release v$version already exists; builds only."
             else
               release=true
