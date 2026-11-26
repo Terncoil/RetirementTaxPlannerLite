@@ -212,6 +212,7 @@ def investment_income_tax(
         "dividends": h.qualified_dividends + h.nonqualified_dividends + extra_qd,
     }
     income = sum(max(0.0, amounts[k]) for k in tax.income)
+    income = max(0.0, income + h.state_investment_income_adjustment)
     if income <= 0:
         return 0.0
     ages = profile.ages()

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 from rtpl.app import TIP_WIDTH
 from rtpl.app.inputs import ComboBox, DoubleSpinBox, SpinBox
 from rtpl.model.profile import ACA_PLAN_TIERS, FILING_STATUS_LABELS, Household, Person, Profile
-from rtpl.taxlaw.loader import FederalLaw, status_key
+from rtpl.taxlaw.loader import FederalLaw, StateLaw, status_key
 
 PERSON_MONEY = [
     ("social_security", "Social Security"),
@@ -42,6 +42,7 @@ HOUSEHOLD_MONEY = [
     ("short_term_capital_gains", "Net short-term capital gains"),
     ("other_ordinary_income", "Other ordinary income"),
     ("other_investment_income", "Rental / passive income"),
+    ("state_investment_income_adjustment", "State interest & dividends adjustment"),
     ("adjustments", "Above-the-line adjustments"),
     ("itemized_deductions", "Itemized deductions"),
     ("charitable_cash_gifts", "Cash gifts to charity"),
@@ -84,6 +85,31 @@ def charity_tip(law: FederalLaw, filing_status: str) -> str:
         "itemized deductions.")
 
 
+STATE_ADJUSTMENT_KEY = "state_investment_income_adjustment"
+
+
+def state_adjustment_tip(state: StateLaw | None, year: int) -> str:
+    """Tooltip for the state interest and dividends adjustment, naming the
+    year's tax from the state's law file."""
+    tax = state.investment_income_tax if state is not None else None
+    if tax is None:
+        where = f"{state.name} in {year}" if state is not None else "no state"
+        return _fill(
+            "Used only where a state taxes interest and dividends on their own, "
+            f"with no tax on wages. Not used for {where}.")
+    kinds = {"interest": "taxable interest", "tax_exempt_interest": "tax-exempt interest",
+             "dividends": "dividends"}
+    taxed = ", ".join(kinds[k] for k in tax.income)
+    return _fill(
+        f"Changes the income {state.name}'s {tax.name} ({year}, {tax.rate:.0%}) "
+        f"is figured on: this year's {taxed}, plus this amount.",
+        "Enter a negative amount for interest the state exempts but the profile "
+        "includes (U.S. Treasury interest, the state's own municipal bonds), and "
+        "a positive amount for interest it taxes that the profile leaves out "
+        "(for example corporate bond interest, where bank interest is exempt). "
+        "Federal tax, other states and the forward plan ignore it.")
+
+
 def stcg_tip(law: FederalLaw, filing_status: str) -> str:
     """Tooltip for short-term gains, with the year's capital loss limit."""
     limit = law.capital_loss_limit[status_key(filing_status)]
@@ -115,8 +141,9 @@ MONEY_TIPS = {
         "later years is not modeled."),
 }
 
-# Gains that may be entered as a loss.
+# Amounts that may be entered as negative: gains (a loss) and adjustments.
 GAIN_KEYS = ("long_term_capital_gains", "short_term_capital_gains")
+SIGNED_KEYS = (*GAIN_KEYS, "state_investment_income_adjustment")
 
 # Widest a number field needs to be: "$10,000,000" plus the arrows.
 FIELD_WIDTH = 124
@@ -253,10 +280,16 @@ class ProfileForm(QWidget):
 
     changed = Signal()
 
-    def __init__(self, states: list[str], law_for: Callable[[int], FederalLaw] | None = None) -> None:
+    def __init__(
+        self,
+        states: list[str],
+        law_for: Callable[[int], FederalLaw] | None = None,
+        state_for: Callable[[str, int], StateLaw | None] | None = None,
+    ) -> None:
         super().__init__()
         self._loading = False
         self._law_for = law_for
+        self._state_for = state_for
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
 
@@ -303,7 +336,7 @@ class ProfileForm(QWidget):
         hform = compact_form(QFormLayout(hh))
         self.household_money: dict[str, DoubleSpinBox] = {}
         for key, text in HOUSEHOLD_MONEY:
-            box = money_box(allow_negative=key in GAIN_KEYS)
+            box = money_box(allow_negative=key in SIGNED_KEYS)
             self.household_money[key] = box
             _add_row(hform, text, box, MONEY_TIPS.get(key))
             box.valueChanged.connect(self._emit)
@@ -360,7 +393,7 @@ class ProfileForm(QWidget):
         self.plan_name.textChanged.connect(self._emit)
         self.year.valueChanged.connect(self._year_changed)
         self.filing.currentIndexChanged.connect(self._filing_changed)
-        self.state.currentIndexChanged.connect(self._emit)
+        self.state.currentIndexChanged.connect(self._state_changed)
         self.inflation.valueChanged.connect(self._emit)
         self.brokerage.toggled.connect(self._emit)
         self.aca.toggled.connect(self._emit)
@@ -375,8 +408,29 @@ class ProfileForm(QWidget):
         if not self._loading:
             self.changed.emit()
 
+    def _state_changed(self, *_args) -> None:
+        self.update_law_tips()
+        self._emit()
+
+    def update_state_tip(self) -> None:
+        """Name the year's state tax on interest and dividends, if any, and
+        enable the adjustment only where one applies."""
+        box = self.household_money[STATE_ADJUSTMENT_KEY]
+        code, year = self.state.currentData(), self.year.value()
+        state = None
+        if code and self._state_for is not None:
+            try:
+                state = self._state_for(code, year)
+            except (KeyError, ValueError):
+                state = None
+        _set_tip(box, state_adjustment_tip(state, year))
+        # Keep a value the user entered visible even where it does nothing.
+        box.setEnabled(self._state_for is None or (state is not None and state.taxes_investment_income)
+                       or box.value() != 0)
+
     def update_law_tips(self) -> None:
         """Show the tax year's own amounts in the tooltips that quote them."""
+        self.update_state_tip()
         if self._law_for is None:
             return
         try:

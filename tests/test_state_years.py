@@ -238,3 +238,22 @@ def test_washington_deduction_by_year(lib):
         250_000, 262_000, 270_000, 278_000, 290_000]
     for year in (2020, 2021):
         assert not lib.state("WA", year).has_any_tax
+
+
+def test_state_investment_income_adjustment(lib):
+    # NH: take out Treasury interest the profile counts.
+    st = lib.state("NH", 2024)
+    tax = st.investment_income_tax
+    base = _state_tax(lib, "NH", 2024, taxable_interest=10_000).state_tax
+    adj = _state_tax(lib, "NH", 2024, taxable_interest=10_000, state_investment_income_adjustment=-3_000)
+    assert base - adj.state_tax == pytest.approx(tax.rate * 3_000)
+    assert _state_tax(lib, "NH", 2024, taxable_interest=1_000,
+                      state_investment_income_adjustment=-5_000).state_tax == 0
+    # TN: add corporate bond interest the profile leaves out.
+    r = _state_tax(lib, "TN", 2020, taxable_interest=20_000, state_investment_income_adjustment=6_000)
+    assert r.state_tax == pytest.approx(0.01 * (6_000 - lib.state("TN", 2020).investment_income_tax.exemption["single"]))
+    # Federal tax and states without such a tax ignore it.
+    fed = lambda **h: compute_tax(make(year=2024, state="CA", people=[Person(birth_year=1980, wages=90_000)], **h),
+                                  lib.federal(2024), lib.state("CA", 2024))
+    a, b = fed(taxable_interest=5_000), fed(taxable_interest=5_000, state_investment_income_adjustment=-5_000)
+    assert (a.state_tax, a.total_tax) == pytest.approx((b.state_tax, b.total_tax))

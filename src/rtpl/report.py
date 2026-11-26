@@ -32,6 +32,7 @@ HOUSEHOLD_LABELS = {
     "short_term_capital_gains": "Short-term capital gains",
     "other_ordinary_income": "Other ordinary income",
     "other_investment_income": "Other investment income",
+    "state_investment_income_adjustment": "State interest and dividends adjustment",
     "adjustments": "Adjustments to income",
     "itemized_deductions": "Itemized deductions",
     "charitable_cash_gifts": "Cash gifts to charity",

@@ -178,6 +178,15 @@ file. `StateLaw.has_any_tax` says whether the state taxes any income in
 the law's year (wages, gains only or interest and dividends only), and
 `has_state_layer` whether any of it is in the State Tax layer.
 
+Such a tax is figured on the profile's interest and dividends (the kinds
+the file's `income` lists) plus the household's signed
+`state_investment_income_adjustment`: negative for interest the state
+exempts but the profile counts (U.S. Treasury interest, the state's own
+municipal bonds), positive for interest it taxes that the profile leaves
+out (Tennessee's corporate bond interest). Nothing else uses it. In the
+profile form the field is enabled only for a state and year with such a
+tax, and its tooltip names that tax and rate from the year's file.
+
 **Projection.** Years without a file are built from the newest enacted
 year by `federal/projection.toml`: indexed amounts (brackets, standard
 deductions, capital gains bands, IRMAA thresholds and premiums, poverty
