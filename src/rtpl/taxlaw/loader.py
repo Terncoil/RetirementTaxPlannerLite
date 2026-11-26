@@ -157,6 +157,11 @@ class FederalLaw:
     aca_applicable: tuple[tuple[float, float, float], ...] | None = None
     # Education credits (IRC 25A). None = not in the file (no credits).
     education: "EducationCredits | None" = None
+    # Charitable deduction for non-itemizers (IRC 170(p)): the most cash
+    # gifts deducted with the standard deduction, by filing status, and
+    # the first year it applies. None = not in the file (no deduction).
+    charitable_nonitemizer_limit: dict[str, float] | None = None
+    charitable_nonitemizer_first_year: int | None = None
 
     @property
     def senior_deduction_active(self) -> bool:
@@ -164,6 +169,16 @@ class FederalLaw:
             self.senior_deduction_enabled
             and self.senior_first_year <= self.year <= self.senior_last_year
         )
+
+    def charitable_nonitemizer_cap(self, filing_status: str) -> float:
+        """Most cash gifts deductible this year alongside the standard deduction."""
+        limits = self.charitable_nonitemizer_limit
+        first = self.charitable_nonitemizer_first_year
+        if limits is None or (first is not None and self.year < first):
+            return 0.0
+        if filing_status.lower() == "qss":  # not a joint return
+            return limits["single"]
+        return limits[status_key(filing_status)]
 
     def fpl(self, household_size: int) -> float:
         return self.aca_fpl_first + self.aca_fpl_additional * max(0, household_size - 1)
@@ -234,6 +249,7 @@ def _parse_federal(raw: dict) -> FederalLaw:
     cg = raw["capital_gains"]
     et = raw["social_security"].get("earnings_test", {})
     hsa = raw.get("hsa", {})
+    charity = raw.get("charitable", {})
     return FederalLaw(
         year=int(raw["year"]),
         status=str(raw.get("status", "enacted")),
@@ -288,6 +304,12 @@ def _parse_federal(raw: dict) -> FederalLaw:
             if "applicable_percentage" in aca else None
         ),
         education=_parse_education(raw.get("education_credits")),
+        charitable_nonitemizer_limit=(
+            _by_status(charity["nonitemizer_limit"]) if "nonitemizer_limit" in charity else None
+        ),
+        charitable_nonitemizer_first_year=(
+            int(charity["nonitemizer_first_year"]) if "nonitemizer_first_year" in charity else None
+        ),
     )
 
 

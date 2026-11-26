@@ -484,6 +484,57 @@ def test_aca_and_education_fields_round_trip(window, tmp_path):
     assert window.form.education_last.text() == "This year only"
 
 
+
+def test_charitable_gifts_field(window):
+    form = window.form
+    box = form.household_money["charitable_cash_gifts"]
+    box.setValue(1_500)
+    assert form.profile().household.charitable_cash_gifts == 1_500
+    # The tooltip quotes the cap from the year's tax law and filing status.
+    form.year.setValue(2026)
+    form.filing.setCurrentIndex(form.filing.findData("single"))
+    assert "$1,000" in box.toolTip() and "2026" in box.toolTip()
+    form.filing.setCurrentIndex(form.filing.findData("mfj"))
+    assert "$2,000" in box.toolTip()
+    form.year.setValue(2025)
+    assert "no deduction" in box.toolTip() and "$" not in box.toolTip()
+    stcg = form.household_money["short_term_capital_gains"]
+    form.filing.setCurrentIndex(form.filing.findData("mfs"))
+    assert "$1,500" in stcg.toolTip()
+    form.filing.setCurrentIndex(form.filing.findData("single"))
+    assert "$3,000" in stcg.toolTip()
+
+
+
+def test_check_boxes_have_their_label_on_the_left(window):
+    from PySide6.QtWidgets import QFormLayout
+
+    form = window.form
+    for box, text in ((form.person_boxes[0].blind, "Legally blind"),
+                      (form.brokerage, "Taxable brokerage account"),
+                      (form.aca, "ACA marketplace coverage")):
+        assert box.text() == ""
+        layout = box.parentWidget().layout()
+        assert isinstance(layout, QFormLayout)
+        label = layout.labelForField(box)
+        assert label is not None and label.text() == text
+        assert box.accessibleName() == text
+
+def test_law_tips_read_the_tax_law_files():
+    from dataclasses import replace
+
+    from rtpl.app.profile_form import charity_tip, stcg_tip
+    from rtpl.taxlaw.loader import TaxLawLibrary
+
+    law = TaxLawLibrary().federal(2030)
+    changed = replace(law, charitable_nonitemizer_limit={"single": 1500, "mfj": 3000, "mfs": 1500, "hoh": 1500},
+                      capital_loss_limit={"single": 4000, "mfj": 4000, "mfs": 2000, "hoh": 4000})
+    assert "$1,500" in charity_tip(changed, "single") and "2030" in charity_tip(changed, "single")
+    assert "$3,000" in charity_tip(changed, "mfj")
+    assert "$2,000" in stcg_tip(changed, "mfs")
+    for tip in (charity_tip(changed, "mfj"), stcg_tip(changed, "mfs")):
+        assert all(len(line) <= 70 for line in tip.split("\n"))
+
 def test_new_profile_defaults(window, monkeypatch):
     """View > New Profile Defaults sets what File > New starts from, kept
     in the settings folder rather than in any profile file."""

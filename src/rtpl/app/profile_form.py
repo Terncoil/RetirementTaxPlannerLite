@@ -7,6 +7,9 @@ as everyone else.
 
 from __future__ import annotations
 
+import textwrap
+from typing import Callable
+
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -18,8 +21,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from rtpl.app import TIP_WIDTH
 from rtpl.app.inputs import ComboBox, DoubleSpinBox, SpinBox
 from rtpl.model.profile import ACA_PLAN_TIERS, FILING_STATUS_LABELS, Household, Person, Profile
+from rtpl.taxlaw.loader import FederalLaw, status_key
 
 PERSON_MONEY = [
     ("social_security", "Social Security"),
@@ -39,6 +44,7 @@ HOUSEHOLD_MONEY = [
     ("other_investment_income", "Rental / passive income"),
     ("adjustments", "Above-the-line adjustments"),
     ("itemized_deductions", "Itemized deductions"),
+    ("charitable_cash_gifts", "Cash gifts to charity"),
 ]
 
 # Monthly ACA marketplace premiums, per person.
@@ -55,15 +61,58 @@ PERSON_ACA = [
      "Leave at $0 to use the benchmark premium."),
 ]
 
+def _fill(*paragraphs: str) -> str:
+    return "\n".join(textwrap.fill(p, TIP_WIDTH) for p in paragraphs)
+
+
+def charity_tip(law: FederalLaw, filing_status: str) -> str:
+    """Tooltip for cash gifts, with the year's cap for this filing status."""
+    cap = law.charitable_nonitemizer_cap(filing_status)
+    label = FILING_STATUS_LABELS.get(filing_status, filing_status).lower()
+    if cap <= 0:
+        return _fill(
+            f"Cash gifts to charity this year. In {law.year} there is no deduction "
+            "for them with the standard deduction; include them in itemized "
+            "deductions if you itemize.")
+    return _fill(
+        f"Cash gifts to charity this year. If you take the standard deduction "
+        f"you can also deduct up to ${cap:,.0f} of them in {law.year} ({label}); "
+        "anything over that has no effect.",
+        "It lowers taxable income but not AGI, so Social Security, IRMAA and "
+        "ACA amounts don't change. Gifts to donor-advised funds don't count. "
+        "State taxes ignore it. Ignored if you itemize, so include them in "
+        "itemized deductions.")
+
+
+def stcg_tip(law: FederalLaw, filing_status: str) -> str:
+    """Tooltip for short-term gains, with the year's capital loss limit."""
+    limit = law.capital_loss_limit[status_key(filing_status)]
+    label = FILING_STATUS_LABELS.get(filing_status, filing_status).lower()
+    return _fill(
+        "Taxed as ordinary income. Enter a net loss as a negative amount.",
+        f"A loss first offsets the other term's gains; at most ${limit:,.0f} "
+        f"of a net loss reduces other income in {law.year} ({label}). "
+        "Carrying the rest to later years is not modeled.")
+
+
 MONEY_TIPS = {
     "social_security": "Yearly Social Security benefit, before Medicare premiums.",
-    "itemized_deductions": "Leave at $0 to use the standard deduction.",
+    "itemized_deductions": (
+        "Leave at $0 to use the standard deduction. If you itemize,\n"
+        "include your charitable gifts here."),
+    "charitable_cash_gifts": (
+        "Cash gifts to charity this year. From 2026, if you take the\n"
+        "standard deduction you can also deduct some of them, up to a\n"
+        "yearly cap. Ignored if you itemize, so include them in itemized\n"
+        "deductions."),
     "long_term_capital_gains": "Enter a net loss as a negative amount.",
+    # The amounts in these two tips come from the year's tax law; see
+    # ProfileForm.update_law_tips. These are the wording without a law.
     "short_term_capital_gains": (
         "Taxed as ordinary income. Enter a net loss as a negative amount.\n"
-        "A loss first offsets the other term's gains; at most $3,000\n"
-        "($1,500 married filing separately) of a net loss reduces other\n"
-        "income. Carrying the rest to later years is not modeled."),
+        "A loss first offsets the other term's gains; a net loss reduces\n"
+        "other income by at most the yearly limit. Carrying the rest to\n"
+        "later years is not modeled."),
 }
 
 # Gains that may be entered as a loss.
@@ -95,13 +144,17 @@ def compact_form(form: QFormLayout) -> QFormLayout:
     return form
 
 
+def _set_tip(widget: QWidget, tip: str) -> None:
+    widget.setToolTip(tip)
+    widget.setAccessibleDescription(tip)
+
+
 def _add_row(form: QFormLayout, text: str, widget: QWidget, tip: str | None = None) -> None:
     label = QLabel(text)
     label.setBuddy(widget)
     widget.setAccessibleName(text.replace("&", ""))
     if tip:
-        widget.setToolTip(tip)
-        widget.setAccessibleDescription(tip)
+        _set_tip(widget, tip)
     form.addRow(label, widget)
 
 
@@ -125,7 +178,7 @@ class PersonBox(QGroupBox):
         self.medicare = ComboBox()
         for text, _ in MEDICARE_CHOICES:
             self.medicare.addItem(text)
-        self.blind = QCheckBox("Legally blind")
+        self.blind = QCheckBox()
         _add_row(form, "Name", self.name)
         birth_label = QLabel("Birth year")
         birth_label.setBuddy(self.birth_year)
@@ -142,7 +195,7 @@ class PersonBox(QGroupBox):
             self.medicare,
             "Choose Yes for Medicare before 65 (for example on SSDI),\nso IRMAA applies.",
         )
-        form.addRow("", self.blind)
+        _add_row(form, "Legally blind", self.blind)
         self.money: dict[str, DoubleSpinBox] = {}
         for key, text in PERSON_MONEY:
             box = money_box()
@@ -191,13 +244,19 @@ class PersonBox(QGroupBox):
 
 
 class ProfileForm(QWidget):
-    """Edits a :class:`Profile`; emits ``changed`` on every edit."""
+    """Edits a :class:`Profile`; emits ``changed`` on every edit.
+
+    ``law_for`` gives the federal law for a tax year, so tooltips can show
+    that year's amounts (such as the charitable deduction cap). Without it
+    they keep their general wording.
+    """
 
     changed = Signal()
 
-    def __init__(self, states: list[str]) -> None:
+    def __init__(self, states: list[str], law_for: Callable[[int], FederalLaw] | None = None) -> None:
         super().__init__()
         self._loading = False
+        self._law_for = law_for
         outer = QVBoxLayout(self)
         outer.setContentsMargins(6, 6, 6, 6)
 
@@ -248,10 +307,10 @@ class ProfileForm(QWidget):
             self.household_money[key] = box
             _add_row(hform, text, box, MONEY_TIPS.get(key))
             box.valueChanged.connect(self._emit)
-        self.brokerage = QCheckBox("Taxable brokerage account")
-        self.brokerage.setToolTip("The household has a taxable brokerage account.")
-        self.aca = QCheckBox("ACA marketplace coverage")
-        self.aca.setToolTip("The household buys health coverage on an ACA marketplace.")
+        # Check boxes go in the field column with their label on the left,
+        # like every other row.
+        self.brokerage = QCheckBox()
+        self.aca = QCheckBox()
         self.household_size = SpinBox()
         self.household_size.setRange(0, 20)
         self.household_size.setSpecialValueText("Automatic")
@@ -259,8 +318,10 @@ class ProfileForm(QWidget):
         self.aca_tier = ComboBox()
         for key, text in ACA_PLAN_TIERS.items():
             self.aca_tier.addItem(text, key)
-        hform.addRow("", self.brokerage)
-        hform.addRow("", self.aca)
+        _add_row(hform, "Taxable brokerage account", self.brokerage,
+                 "The household has a taxable brokerage account.")
+        _add_row(hform, "ACA marketplace coverage", self.aca,
+                 "The household buys health coverage on an ACA marketplace.")
         _add_row(hform, "ACA plan tier", self.aca_tier,
                  "Metal tier of the marketplace plan. Cost-sharing reductions (the\n"
                  "250% FPL line) only come with a Silver plan.")
@@ -314,6 +375,18 @@ class ProfileForm(QWidget):
         if not self._loading:
             self.changed.emit()
 
+    def update_law_tips(self) -> None:
+        """Show the tax year's own amounts in the tooltips that quote them."""
+        if self._law_for is None:
+            return
+        try:
+            law = self._law_for(self.year.value())
+        except (KeyError, ValueError):
+            return
+        fs = self.filing.currentData()
+        _set_tip(self.household_money["charitable_cash_gifts"], charity_tip(law, fs))
+        _set_tip(self.household_money["short_term_capital_gains"], stcg_tip(law, fs))
+
     def _year_changed(self, year: int) -> None:
         for box in self.person_boxes:
             box.set_tax_year(year)
@@ -324,11 +397,13 @@ class ProfileForm(QWidget):
         last.setMinimum(year - 1)
         last.setValue(keep if keep is not None and keep >= year else year - 1)
         last.blockSignals(False)
+        self.update_law_tips()
         self._emit()
 
     def _filing_changed(self, *_args) -> None:
         married = self.filing.currentData() in ("mfj", "mfs")
         self.person_boxes[1].setVisible(married)
+        self.update_law_tips()
         self._emit()
 
     def set_profile(self, profile: Profile) -> None:
@@ -358,6 +433,7 @@ class ProfileForm(QWidget):
             self.person_boxes[1].setVisible(profile.filing_status in ("mfj", "mfs"))
         finally:
             self._loading = False
+        self.update_law_tips()
         self.changed.emit()
 
     def profile(self) -> Profile:

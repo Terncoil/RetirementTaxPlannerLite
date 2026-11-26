@@ -34,6 +34,7 @@ HOUSEHOLD_LABELS = {
     "other_investment_income": "Other investment income",
     "adjustments": "Adjustments to income",
     "itemized_deductions": "Itemized deductions",
+    "charitable_cash_gifts": "Cash gifts to charity",
 }
 
 

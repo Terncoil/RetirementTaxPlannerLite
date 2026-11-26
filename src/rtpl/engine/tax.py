@@ -9,6 +9,8 @@ What is modelled for the marginal graph:
     additional 65+/blind standard deduction, personal exemptions (0 today)
   * taxation of Social Security benefits (provisional income, 50%/85% tiers)
   * the OBBBA enhanced senior deduction and its 6% MAGI phase-out
+  * the OBBBA charitable deduction for non-itemizers (2026 on), which
+    lowers taxable income but not AGI
   * qualified dividends and long-term gains stacked on ordinary income
   * Net Investment Income Tax
   * an optional state layer (bracketed or flat, with SS / retirement exemptions)
@@ -79,6 +81,8 @@ class TaxResult:
     capital_gains_tax: float
     niit: float
     state_tax: float  # all state tax, including state_gains_tax
+    # cash gifts deducted alongside the standard deduction (0 when itemizing)
+    charitable_deduction: float = 0.0
     state_gains_tax: float = 0.0  # under the state's separate capital gains rules
     # credits
     nonrefundable_credits: float = 0.0  # education credits allowed before the tax limit
@@ -227,6 +231,12 @@ def _standard_deduction(profile: Profile, law: FederalLaw) -> float:
     return law.standard_deduction[fs] + extra_each * boxes
 
 
+def charitable_nonitemizer_deduction(profile: Profile, law: FederalLaw) -> float:
+    """Cash gifts deductible with the standard deduction, before choosing it."""
+    gifts = max(0.0, profile.household.charitable_cash_gifts)
+    return min(gifts, law.charitable_nonitemizer_cap(profile.filing_status))
+
+
 def net_capital_gains(stcg: float, ltcg: float, loss_limit: float) -> tuple[float, float]:
     """Net short- and long-term results as Schedule D does.
 
@@ -294,13 +304,20 @@ def compute_tax(
     agi = agi_ex_ss + taxable_ss
 
     std = _standard_deduction(profile, law)
-    deduction = max(std, h.itemized_deductions) + law.personal_exemption * len(profile.people)
+    # Itemize only when it beats the standard deduction plus the
+    # non-itemizer charitable deduction that comes with it.
+    charity = charitable_nonitemizer_deduction(profile, law)
+    itemizing = h.itemized_deductions > std + charity
+    chosen = h.itemized_deductions if itemizing else std
+    if itemizing:
+        charity = 0.0
+    deduction = chosen + law.personal_exemption * len(profile.people)
     if senior_deduction_override is None:
         senior = senior_deduction(profile, law, agi)
     else:
         senior = senior_deduction_override
 
-    taxable = max(0.0, agi - deduction - senior)
+    taxable = max(0.0, agi - deduction - senior - charity)
     pref = min(qd + ltcg, taxable)
     ord_taxable = taxable - pref
     ordinary_tax = law.ordinary[fs].tax(ord_taxable)
@@ -328,7 +345,7 @@ def compute_tax(
     if state is not None:
         state_income, state_gains_tax = state_income_tax(
             profile, state, agi=agi, taxable_ss=taxable_ss, net_ltcg=ltcg, extra_ira=add_ord,
-            federal_deduction=max(std, h.itemized_deductions), tax_exempt_interest=h.tax_exempt_interest,
+            federal_deduction=chosen, tax_exempt_interest=h.tax_exempt_interest,
         )
         state_tax = state_income + state_gains_tax
 
@@ -350,6 +367,7 @@ def compute_tax(
         capital_gains_tax=cg_tax,
         niit=niit,
         state_tax=state_tax,
+        charitable_deduction=charity,
         state_gains_tax=state_gains_tax,
         nonrefundable_credits=nonref,
         nonrefundable_used=used,

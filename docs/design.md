@@ -59,7 +59,9 @@ the forward-looking plan and the command-line exporter.
    one or two people with birth year, a *Medicare Part B enrolled* choice
    (Automatic / Yes / No, so SSDI recipients under 65 get IRMAA), Social
    Security, wages, pension and IRA withdrawals; household interest,
-   dividends, gains, other income, adjustments, itemized deductions, and
+   dividends, gains, other income, adjustments, itemized deductions, cash
+   gifts to charity (deducted up to a cap alongside the standard deduction
+   from 2026; below the line, so AGI and every MAGI are unchanged), and
    switches for *has a taxable brokerage account* and *buys ACA coverage*.
    For the ACA premium tax credit, each person's monthly benchmark Silver
    premium and the premium of the plan they'd buy, plus the plan's metal
@@ -82,7 +84,10 @@ reference points and the premium tax credit's applicable percentage table
 (`[aca] applicable_percentage`: band start as a multiple of the poverty
 line, initial and final share of income), and the education credits
 (`[education_credits]`: AOTC and Lifetime Learning amounts and MAGI
-phase-outs, fixed in statute). A `[policy]` table holds switches:
+phase-outs, fixed in statute), and from 2026 the charitable deduction for
+non-itemizers (`[charitable]`: first year and cap by filing status, not
+indexed; no state allows it, since every state here starts from federal
+AGI). A `[policy]` table holds switches:
 
 * `personal_exemption` (0 under TCJA, kept by OBBBA)
 * `senior_deduction` (on for 2025–2028)

@@ -1046,3 +1046,13 @@ def test_short_term_gain_and_loss_streams_net_with_long_term_gains(lib):
     assert y28.tax.ordinary_income == pytest.approx(57_000)  # net loss capped at $3,000
     # A loss is not shown as negative income.
     assert all(s.amount > 0 for yr in res.years for s in yr.sources)
+
+
+def test_charitable_gifts_carry_into_each_plan_year(lib):
+    prof = single(birth=1960)
+    lives_to(prof, 68)
+    prof.household.charitable_cash_gifts = 800
+    plan = Plan(profile=prof, incomes=[IncomeStream(kind="wages", amount=60_000, owner=0, cola="none")])
+    res = run_plan(plan, lib)
+    assert all(yr.tax.charitable_deduction > 0 for yr in res.years)
+    assert all(yr.tax.charitable_deduction <= 1_000 for yr in res.years)

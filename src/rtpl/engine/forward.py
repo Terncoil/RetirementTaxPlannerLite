@@ -643,6 +643,7 @@ class PlanEngine:
             adjustments=h.adjustments * infl,
             hsa_deduction=y.hsa_deduction,
             itemized_deductions=h.itemized_deductions * infl,
+            charitable_cash_gifts=h.charitable_cash_gifts * infl,
             has_taxable_brokerage=h.has_taxable_brokerage,
             aca_marketplace=h.aca_marketplace,
             aca_plan_tier=h.aca_plan_tier,
