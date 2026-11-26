@@ -279,7 +279,7 @@ class NewProfileDefaultsDialog(QDialog):
     """
 
     def __init__(self, defaults: Profile, current: Profile, builtin: Profile,
-                 states: list[str], parent=None) -> None:
+                 states: list[str], parent=None, law_for=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("New Profile Defaults")
         self._current = current
@@ -289,7 +289,7 @@ class NewProfileDefaultsDialog(QDialog):
                        "app's settings, not saved in any profile or plan file.")
         intro.setWordWrap(True)
         outer.addWidget(intro)
-        self.form = ProfileForm(states)
+        self.form = ProfileForm(states, law_for=law_for)
         self.form.set_profile(defaults)
         # New profiles always start in the current calendar year.
         self.form.year.setEnabled(False)
@@ -365,7 +365,7 @@ class MainWindow(QMainWindow):
 
         # Side panels: inputs on the left, graph options on the right. Each
         # can be pinned beside the graph or pop open over it.
-        self.form = ProfileForm(self.library.available_states())
+        self.form = ProfileForm(self.library.available_states(), law_for=self._law_for_tips)
         # On the Forward plan page the panel also lists the plan's items; the
         # profile becomes its Baseline tab. Elsewhere only the profile shows.
         self.plan_editor = PlanEditor()
@@ -437,7 +437,7 @@ class MainWindow(QMainWindow):
     def edit_new_profile_defaults(self) -> None:
         dlg = NewProfileDefaultsDialog(
             self._new_profile_defaults(), self.form.profile(), self._starter_profile(),
-            self.library.available_states(), self,
+            self.library.available_states(), self, law_for=self._law_for_tips,
         )
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
@@ -448,6 +448,10 @@ class MainWindow(QMainWindow):
         else:
             profile.save(self.new_defaults_path)
         self.statusBar().showMessage("File > New will use these defaults")
+
+    def _law_for_tips(self, year: int):
+        """Federal law for ``year``, for tooltips that quote its amounts."""
+        return self.library.federal(year)
 
     @staticmethod
     def _starter_profile() -> Profile:
