@@ -10,21 +10,17 @@ with ``changed`` so the worksheet can recalculate.
 from __future__ import annotations
 
 import datetime as dt
-import re
 import textwrap
 
 from PySide6.QtCore import QDate, Qt, Signal
 from PySide6.QtGui import (
-    QAction,
     QBrush,
     QColor,
-    QFont,
     QIcon,
     QPainter,
     QPalette,
     QPen,
     QPixmap,
-    QTextCharFormat,
 )
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -49,7 +45,6 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QTextEdit,
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -61,6 +56,7 @@ from PySide6.QtWidgets import (
 
 from rtpl.app import TIP_WIDTH
 from rtpl.app.inputs import ComboBox, SpinBox
+from rtpl.app.notes_edit import NotesEdit
 from rtpl.app.profile_form import MEDICARE_CHOICES, compact_form
 from rtpl.model.eqta import (
     PAYMENT_LINES,
@@ -476,130 +472,6 @@ class ProfilePage(QWidget):
             except ValueError:
                 edit.setStyleSheet(ERROR_SHEET)
         self.changed.emit()
-
-
-_MD_SPECIAL = re.compile(r"([\\`*_\[\]<>~|])")
-_MD_LINE_START = re.compile(r"^(\s*)([#>+=-])")
-_MD_NUMBERED = re.compile(r"^(\s*\d+)([.)])")
-
-
-def _md_escape(text: str) -> str:
-    return _MD_SPECIAL.sub(r"\\\1", text)
-
-
-def document_markdown(doc) -> str:
-    """The text as Markdown with only bold and italic.
-
-    ``QTextDocument.toMarkdown`` decides bold from the font actually found
-    on the system, so it drops bold where no bold face is installed (as on
-    a test machine); this reads the character formats instead.
-    """
-    paragraphs = []
-    block = doc.begin()
-    while block.isValid():
-        runs: list[list] = []  # [bold, italic, text]
-        it = block.begin()
-        while not it.atEnd():
-            frag = it.fragment()
-            fmt = frag.charFormat()
-            style = [fmt.fontWeight() >= QFont.Weight.Bold, fmt.fontItalic()]
-            if runs and runs[-1][:2] == style:
-                runs[-1][2] += frag.text()
-            else:
-                runs.append([*style, frag.text()])
-            it += 1
-        out = []
-        for bold, italic, text in runs:
-            lines = [_md_escape(t) for t in text.split("\u2028")]  # Shift+Enter
-            text = "\\\n".join(lines)
-            mark = ("**" if bold else "") + ("*" if italic else "")
-            core = text.strip()
-            if mark and core:
-                lead = text[: len(text) - len(text.lstrip())]
-                trail = text[len(text.rstrip()):]
-                text = f"{lead}{mark}{core}{mark[::-1]}{trail}"
-            out.append(text)
-        text = _MD_LINE_START.sub(r"\1\\\2", "".join(out))
-        paragraphs.append(_MD_NUMBERED.sub(r"\1\\\2", text))
-        block = block.next()
-    return "\n\n".join(paragraphs).strip()
-
-
-class NotesEdit(QWidget):
-    """A notes box with simple formatting (bold and italic), kept as Markdown.
-
-    Qt reads and writes the Markdown itself (``QTextDocument.setMarkdown``
-    and ``toMarkdown``), so this needs nothing beyond PySide6. Pasted text
-    arrives plain; Ctrl+B and Ctrl+I, or the buttons, format the selection.
-    """
-
-    changed = Signal()
-
-    def __init__(self, name: str, placeholder: str) -> None:
-        super().__init__()
-        self.text = QTextEdit()
-        self.text.setAccessibleName(name)
-        self.text.setPlaceholderText(placeholder)
-        self.text.setAcceptRichText(False)  # paste as plain text
-        self.text.setTabChangesFocus(True)
-        bar = QHBoxLayout()
-        bar.setContentsMargins(0, 0, 0, 0)
-        self.bold = self._button("B", "Bold (Ctrl+B)", "Ctrl+B", self._set_bold)
-        self.italic = self._button("I", "Italic (Ctrl+I)", "Ctrl+I", self._set_italic)
-        f = self.bold.font()
-        f.setBold(True)
-        self.bold.setFont(f)
-        f = self.italic.font()
-        f.setItalic(True)
-        self.italic.setFont(f)
-        bar.addWidget(self.bold)
-        bar.addWidget(self.italic)
-        bar.addStretch(1)
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addLayout(bar)
-        lay.addWidget(self.text, 1)
-        self._loading = False
-        self.text.textChanged.connect(self._changed)
-        self.text.currentCharFormatChanged.connect(self._format_changed)
-
-    def _button(self, text: str, tip: str, keys: str, slot) -> QToolButton:
-        action = QAction(text, self.text, checkable=True, shortcut=keys, toolTip=tip)
-        action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
-        action.triggered.connect(slot)
-        self.text.addAction(action)
-        button = QToolButton()
-        button.setDefaultAction(action)
-        button.setAccessibleName(tip.split(" (")[0])
-        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # keep the selection in the text
-        return button
-
-    def _set_bold(self, _checked: bool = False) -> None:
-        # Toggle from the text's own format, not the button's state, so a
-        # stale check mark can never turn bold off when it should go on.
-        on = self.text.fontWeight() < QFont.Weight.Bold
-        self.text.setFontWeight(QFont.Weight.Bold if on else QFont.Weight.Normal)
-        self._format_changed(self.text.currentCharFormat())
-
-    def _set_italic(self, _checked: bool = False) -> None:
-        self.text.setFontItalic(not self.text.fontItalic())
-        self._format_changed(self.text.currentCharFormat())
-
-    def _format_changed(self, fmt: QTextCharFormat) -> None:
-        self.bold.defaultAction().setChecked(fmt.fontWeight() >= QFont.Weight.Bold)
-        self.italic.defaultAction().setChecked(fmt.fontItalic())
-
-    def set_markdown(self, text: str) -> None:
-        self._loading = True
-        self.text.setMarkdown(text)
-        self._loading = False
-
-    def markdown(self) -> str:
-        return document_markdown(self.text.document())
-
-    def _changed(self) -> None:
-        if not self._loading:
-            self.changed.emit()
 
 
 class NotesPage(QWidget):

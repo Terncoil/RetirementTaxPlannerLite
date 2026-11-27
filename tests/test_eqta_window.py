@@ -391,9 +391,48 @@ def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
 def test_notes_markdown_round_trips(win, text):
     from PySide6.QtWidgets import QTextEdit
 
-    from rtpl.app.eqta_editor import document_markdown
+    from rtpl.app.notes_edit import document_markdown
 
     a, b = QTextEdit(), QTextEdit()
     a.setMarkdown(text)
     b.setMarkdown(document_markdown(a.document()))
     assert b.toHtml() == a.toHtml()
+
+
+def test_notes_toolbar_and_typing_shortcuts(win):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+
+    from rtpl.app.notes_edit import NUMBERED, NotesEdit
+
+    ed = NotesEdit("Notes", "")
+    ed.show()
+    t = ed.text
+    QTest.keyClicks(t, "## Plan")
+    QTest.keyClick(t, Qt.Key.Key_Return)
+    QTest.keyClicks(t, "- first")
+    QTest.keyClick(t, Qt.Key.Key_Return)
+    QTest.keyClicks(t, "second")
+    QTest.keyClick(t, Qt.Key.Key_Tab)
+    assert ed.style.currentText() == "Normal" and ed.bullets.defaultAction().isChecked()
+    QTest.keyClick(t, Qt.Key.Key_Return)
+    QTest.keyClick(t, Qt.Key.Key_Backtab)
+    QTest.keyClicks(t, "third")
+    QTest.keyClick(t, Qt.Key.Key_Return)
+    QTest.keyClick(t, Qt.Key.Key_Return)  # an empty item ends the list
+    QTest.keyClicks(t, "1. one")
+    QTest.keyClick(t, Qt.Key.Key_Return)
+    QTest.keyClicks(t, "two")
+    assert ed.numbers.defaultAction().isChecked()
+    assert ed.markdown() == "## Plan\n\n- first\n    - second\n- third\n\n1. one\n2. two"
+    ed.toggle_list(NUMBERED)  # the same kind again ends the list
+    assert ed.markdown().endswith("- third\n\n1. one\n\ntwo")
+    ed.set_heading(1)
+    assert ed.markdown().endswith("\n\n# two") and ed.style.currentText() == "Heading 1"
+    ed.set_heading(0)
+    assert ed.markdown().endswith("\n\ntwo")
+    # A # typed mid-line is just text.
+    ed.set_markdown("")
+    QTest.keyClicks(t, "Item #1 ok")
+    assert ed.markdown() == "Item #1 ok"
+    ed.deleteLater()

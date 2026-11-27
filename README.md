@@ -139,8 +139,9 @@ register of dates and amounts; amounts take simple arithmetic such as
 `3662.90*12`, and dates can be typed as MM/DD or picked from the calendar
 button in the date cell. A source with no name shows as its tax type, and
 a source that belongs to someone adds " - " and their name. Notes take
-bold and italic (Ctrl+B, Ctrl+I or the B and I buttons) and are saved as
-Markdown.
+headings 1 to 3, bold, italic, and bulleted and numbered lists, from the
+toolbar or by typing `# ` to `### `, `- ` or `1. ` at the start of a line
+(Tab and Shift+Tab indent a list item), and are saved as Markdown.
 
 The **Worksheet** totals each source through March 31, May 31, August 31
 and December 31, plus the Plan column, and shows the estimated tax on that
