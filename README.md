@@ -135,7 +135,9 @@ and last year's tax and AGI for the safe harbor), **Notes**, the four
 and estimated payments) and the income sources, grouped by tax type. Each
 source and payment line has an optional annual plan amount, notes and a
 register of dates and amounts; amounts take simple arithmetic such as
-`3662.90*12`.
+`3662.90*12`, and dates can be typed as MM/DD or picked from the calendar
+button in the date cell. A source with no name shows as its tax type, and
+a source that belongs to someone adds " - " and their name.
 
 The **Worksheet** totals each source through March 31, May 31, August 31
 and December 31, plus the Plan column, and shows the estimated tax on that
@@ -144,7 +146,8 @@ is owed. The state lines follow the state's own schedule (Virginia's first
 period runs to April 30; California's installments are 30/40/0/30).
 Dimmed guidance lines show the annualized method (Form 2210 Schedule AI)
 and the regular safe-harbor installments. **Calculation detail** shows the
-steps behind each column. See "Estimated Quarterly Tax Assistant" in
+steps behind each column. Whole-dollar amounts round 50 cents up, as the
+IRS does; the calculations keep the cents. See "Estimated Quarterly Tax Assistant" in
 [docs/design.md](docs/design.md).
 
 ## Tax law files

@@ -69,7 +69,7 @@ def test_new_file_has_this_years_tab(win):
 def test_worksheet_rows(win):
     win.load(sample(), None)
     rows = cell_rows(win)
-    assert rows["  Alex SS · Alex"] == ["$7,950", "$13,250", "$21,200", "$29,150", "$31,800"]
+    assert rows["  Alex SS - Alex"] == ["$7,950", "$13,250", "$21,200", "$29,150", "$31,800"]
     assert rows["  Stock fund (estimated, 80%)"][:2] == ["$960", "$960"]
     assert rows["  Stock fund (estimated, 20%)"][:2] == ["$240", "$240"]
     dues = [cells for label, cells in row_list(win) if label == "Due date"]
@@ -186,3 +186,105 @@ def test_tooltip_lines_fit(win):
         tips.update(a.toolTip() for a in menu.actions())
     long = sorted({line for t in tips for line in t.split("\n") if len(line) > TIP_WIDTH})
     assert not long, "\n".join(long)
+
+
+def test_whole_dollars_round_half_up_like_the_irs():
+    from rtpl.app.eqta_worksheet import money
+
+    assert [money(v) for v in (2.5, 3.5, 2.49, -2.5, 1234.5, 0.1 * 25)] == [
+        "$3", "$4", "$2", "-$3", "$1,235", "$3"]
+
+
+def test_default_names_show_the_tax_type_and_person(win):
+    win.load(sample(), None)
+    ty = win.current_year()
+    ty.sources[0].name = ""
+    win.editor.set_year(win.eq, ty)
+    win.recompute()
+    labels = [label for label, _ in row_list(win)]
+    assert "  Social Security - Alex" in labels and "  Sam wages - Sam" in labels
+    assert "  Gains" in labels  # household sources have no person
+    node = win.editor._find(("source", 0))
+    assert node.text(0) == "Social Security - Alex"
+    win.editor.add_source("pension")
+    assert win.editor.tree.currentItem().text(0) == "Pension - Alex"
+    assert win.editor.item_page.name.text() == "" and win.editor.item_page.name.placeholderText() == "Pension"
+
+
+def test_mistakes_show_dark_text_on_red(win):
+    from PySide6.QtGui import QColor
+
+    from rtpl.app.eqta_editor import ERROR_SHEET
+
+    ed = win.editor
+    ed.add_source("wages")
+    page = ed.item_page
+    page.plan.setText("12*")
+    page.plan.textEdited.emit("12*")
+    assert page.plan.styleSheet() == ERROR_SHEET and "color: #000000" in ERROR_SHEET
+    page.plan.setText("12")
+    page.plan.textEdited.emit("12")
+    assert page.plan.styleSheet() == ""
+    item = page.register.table.item(0, 1)
+    item.setText("abc")
+    assert item.foreground().color() == QColor("#000000")
+    item.setText("5")
+    assert item.foreground().style() == QtCore.Qt.BrushStyle.NoBrush
+
+
+def test_profile_shows_age_at_end_of_year(win):
+    win.load(sample(), None)
+    page = win.editor.profile_page
+    assert page.ages[0].text() == "Age 68 at end of 2026"
+    page.people_boxes[0][2].setValue(1960)
+    assert page.ages[0].text() == "Age 66 at end of 2026"
+
+
+def test_buttons_sit_above_the_tree_and_the_register(win):
+    ed = win.editor
+    ed.add_source("wages")
+    pos = lambda w: w.mapTo(win, QtCore.QPoint(0, 0)).y()  # noqa: E731
+    win.resize(1100, 700)
+    win.show()
+    QtWidgets.QApplication.processEvents()
+    assert pos(ed.add_btn) < pos(ed.tree)
+    reg = ed.item_page.register
+    assert pos(reg.delete_btn) < pos(reg.table)
+    win.hide()
+
+
+def test_register_date_picker(win):
+    from rtpl.app.eqta_editor import DateEdit
+
+    ed = win.editor
+    ed.add_source("wages")
+    reg = ed.item_page.register
+    year = win.current_year().year
+    assert reg.calendar_range == (dt.date(year, 1, 1), dt.date(year, 12, 31))
+    editor = reg.table.itemDelegateForColumn(0).createEditor(reg.table.viewport(), None, None)
+    assert isinstance(editor, DateEdit)
+    editor.setText("3/15")
+    editor.show_calendar()
+    cal = editor.calendar.actions()[0].defaultWidget()
+    assert cal.selectedDate().toPython() == dt.date(year, 3, 15)
+    assert cal.maximumDate().toPython() == dt.date(year, 12, 31)
+    cal.clicked.emit(cal.selectedDate().addDays(1))
+    assert editor.text() == f"03/16/{year}"
+    editor.deleteLater()
+    # Estimated payments: the next January too.
+    node = ed._find(("payment", "federal_estimated"))
+    ed.tree.setCurrentItem(node)
+    assert reg.calendar_range[1] == dt.date(year + 1, 1, 31)
+
+
+def test_panel_fits_each_form(win):
+    win.load(sample(), None)
+    ed = win.editor
+    widths = []
+    for key in (("profile", None), ("source", 0), ("payment", "state_estimated"), ("source", 2)):
+        ed.tree.setCurrentItem(ed._find(key))
+        need = ed.minimumSizeHint().width()
+        assert win.inputs_panel.minimumWidth() >= need
+        assert win.inputs_panel.scroll.horizontalScrollBar().value() == 0
+        widths.append(win.inputs_panel.minimumWidth())
+    assert max(widths) <= 420  # the long tax type names don't widen it

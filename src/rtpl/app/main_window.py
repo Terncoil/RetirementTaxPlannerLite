@@ -121,6 +121,27 @@ class AppStyle(QProxyStyle):
         super().drawControl(element, option, painter, widget)
 
 
+_theme_mode = {"effective": "light"}  # the mode apply_app_theme last set
+
+
+def sync_title_bar(window: QWidget) -> None:
+    """Windows 10 and 11 draw a window's title bar light unless the app asks
+    for a dark one, and Qt only asks for windows made while the system is in
+    dark mode. Ask for every window, after it is shown, to match the app's
+    theme. Elsewhere the window manager draws the title bar: nothing to do."""
+    if sys.platform != "win32" or not window.testAttribute(Qt.WidgetAttribute.WA_WState_Created):
+        return
+    import ctypes
+
+    dark = ctypes.c_int(1 if _theme_mode["effective"] == "dark" else 0)
+    hwnd = ctypes.c_void_p(int(window.winId()))
+    dwm = ctypes.windll.dwmapi
+    # DWMWA_USE_IMMERSIVE_DARK_MODE is 20, or 19 before Windows 10 20H1.
+    for attribute in (20, 19):
+        if dwm.DwmSetWindowAttribute(hwnd, attribute, ctypes.byref(dark), ctypes.sizeof(dark)) == 0:
+            break
+
+
 def apply_app_theme(app: QApplication, mode: str) -> str:
     """Apply light/dark to the Qt widgets. Returns the effective mode."""
     hints = QGuiApplication.styleHints()
@@ -199,6 +220,10 @@ def apply_app_theme(app: QApplication, mode: str) -> str:
         if sheet:
             widget.setStyleSheet("")
             widget.setStyleSheet(sheet)
+    _theme_mode["effective"] = mode
+    for widget in app.topLevelWidgets():
+        if isinstance(widget, QMainWindow):
+            sync_title_bar(widget)
     return mode
 
 

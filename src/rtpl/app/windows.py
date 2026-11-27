@@ -63,6 +63,10 @@ class AppWindows:
     def show(self, win: QMainWindow) -> QMainWindow:
         if win.isMinimized():
             win.showNormal()
+        from rtpl.app.main_window import sync_title_bar
+
+        win.winId()  # make the native window now, so its title bar is right when shown
+        sync_title_bar(win)  # dark title bar in dark mode, for both windows
         win.show()
         win.raise_()
         win.activateWindow()

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import textwrap
+from decimal import ROUND_HALF_UP, Decimal
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt
@@ -40,11 +41,19 @@ class Line:
     tip: str = ""
 
 
+def whole_dollars(v: float) -> int:
+    """Round to whole dollars as the IRS does: 50 cents and up rounds away
+    from zero ($2.50 is $3), not to the even dollar like Python's round()."""
+    return int(Decimal(str(round(v, 2))).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
 def money(v: float | None) -> str:
+    """A worksheet amount in whole dollars. Only the display is rounded;
+    the calculations keep the cents."""
     if v is None:
         return ""
-    v = round(v)
-    return f"-${-v:,.0f}" if v < 0 else f"${v:,.0f}"
+    v = whole_dollars(v)
+    return f"-${-v:,}" if v < 0 else f"${v:,}"
 
 
 def day(d: dt.date | None) -> str:
@@ -78,14 +87,10 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
             s = ty.sources[i]
             values = [ws.amounts[c][i] * (1 if share is None else share) for c in range(COLUMN_COUNT)]
             sub = [a + b for a, b in zip(sub, values)]
-            name = s.name or "(no name)"
+            name = s.label(ty.profile.people)
             if share is not None:
                 name = f"{name} (estimated, {share:.0%})"
-            who = ""
-            idx = s.person_index(len(ty.profile.people))
-            if idx is not None and len(ty.profile.people) > 1:
-                who = f" · {ty.profile.people[idx].name}"
-            row(f"  {name}{who}", values, tip=textwrap.fill(s.notes, TIP_WIDTH) if s.notes else "")
+            row(f"  {name}", values, tip=textwrap.fill(s.notes, TIP_WIDTH) if s.notes else "")
         if len(members) > 1:
             row(f"Total {label.lower()}", sub, "subtotal")
     if not ty.sources:

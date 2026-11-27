@@ -12,9 +12,10 @@ import datetime as dt
 import textwrap
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QTimer
+from PySide6.QtCore import QEvent, QSettings, Qt, QTimer
 from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QDialog,
     QDialogButtonBox,
@@ -45,6 +46,7 @@ from rtpl.model.eqta import EqtaFile, NewYearDefaults, TaxYear
 from rtpl.taxlaw.loader import TaxLawLibrary
 
 EQTA_NAME = "Estimated Quarterly Tax Assistant"
+DEFAULT_PANEL_WIDTH = 400
 
 QUALIFIED_SHARE_NOTE = (
     "Why the qualified share matters: a fund's ordinary dividends are taxed in "
@@ -147,13 +149,15 @@ class EqtaWindow(QMainWindow):
         self.panels = PanelHost(workspace, self.years)
         self.setCentralWidget(workspace)
         pinned = self.settings.value("panels/inputs_pinned", True) in (True, "true")
-        self.inputs_panel.saved_width = int(self.settings.value("panels/inputs_width", 0) or 0)
+        # Wide enough for the register's amounts and the forms' labels.
+        self.inputs_panel.saved_width = int(self.settings.value("panels/inputs_width", 0) or 0) or DEFAULT_PANEL_WIDTH
         self.panels.add(self.inputs_panel, pinned, pinned)
         self.panels.visibility_changed.connect(self._panel_state_changed)
         self.panels.pinned_changed.connect(self._panel_state_changed)
         self._timer = QTimer(self, singleShot=True, interval=200)
         self._timer.timeout.connect(self.recompute)
         self.editor.changed.connect(self._edited)
+        self.editor.page_changed.connect(self._refit_inputs)
         self._build_toolbar()
         self._build_menus()
         self.statusBar().showMessage("Ready")
@@ -225,18 +229,26 @@ class EqtaWindow(QMainWindow):
             self.resize(1300, 850)
             return
         avail = screen.availableGeometry()
-        w, h = min(1300, avail.width()), min(850, avail.height())
+        w, h = min(1400, avail.width()), min(900, avail.height())
         self.resize(w, h)
         self.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
 
     def reset_layout(self) -> None:
         self.settings.remove("window")
         self.settings.remove("panels")
-        self.inputs_panel.saved_width = 0
+        self.inputs_panel.saved_width = DEFAULT_PANEL_WIDTH
         self.panels.set_pinned(self.inputs_panel, True)
         self.panels.set_open(self.inputs_panel, True)
         self.showNormal()
         self.resize_to_screen()
+
+    def _refit_inputs(self) -> None:
+        """Re-measure the panel for the form now shown: the scroll area takes
+        its height at once and the panel widens if the form needs it, so the
+        form is never cut off or scrolled sideways."""
+        QApplication.sendEvent(self.inputs_panel.scroll, QEvent(QEvent.Type.LayoutRequest))
+        self.panels.refit(self.inputs_panel)
+        self.inputs_panel.scroll.horizontalScrollBar().setValue(0)
 
     def _panel_state_changed(self, *_args) -> None:
         self.inputs_action.setChecked(self.panels.is_open(self.inputs_panel))

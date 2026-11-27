@@ -12,11 +12,14 @@ from __future__ import annotations
 import datetime as dt
 import textwrap
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtCore import QDate, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
+    QCalendarWidget,
     QCheckBox,
+    QComboBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
@@ -28,14 +31,18 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QSizePolicy,
     QStackedWidget,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
+    QTreeWidgetItemIterator,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from rtpl.app import TIP_WIDTH
@@ -63,8 +70,93 @@ AMOUNT_TIP = (
 )
 
 
+# A field or cell with a typing mistake: dark text on light red, in the
+# light and dark themes alike.
+ERROR_BACKGROUND = "#f5b7b1"
+ERROR_TEXT = "#000000"
+ERROR_SHEET = f"background: {ERROR_BACKGROUND}; color: {ERROR_TEXT};"
+
+
 def money(v: float) -> str:
     return f"-${-v:,.2f}" if v < 0 else f"${v:,.2f}"
+
+
+def _calendar_icon() -> QIcon:
+    """A small calendar drawn in the text color, for the date cells."""
+    size = 16
+    pix = QPixmap(size, size)
+    pix.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pix)
+    color = QApplication.palette().color(QPalette.ColorRole.Text)
+    p.setPen(QPen(color, 1))
+    p.drawRect(2, 3, 11, 10)
+    p.fillRect(2, 3, 12, 3, color)
+    for x in (5, 8, 11):
+        for y in (8, 11):
+            p.drawPoint(x, y)
+    p.end()
+    return QIcon(pix)
+
+
+class DateEdit(QLineEdit):
+    """A register date cell: type MM/DD or MM/DD/YYYY, or pick from the
+    calendar button at the right, which shows only the dates that count."""
+
+    picked = Signal()
+
+    def __init__(self, parent, first: dt.date, last: dt.date) -> None:
+        super().__init__(parent)
+        self.first, self.last = first, last
+        act = self.addAction(_calendar_icon(), QLineEdit.ActionPosition.TrailingPosition)
+        act.setToolTip("Pick the date from a calendar")
+        act.triggered.connect(self.show_calendar)
+        self.calendar_action = act
+
+    def show_calendar(self) -> None:
+        menu = QMenu(self)
+        cal = QCalendarWidget()
+        cal.setDateRange(QDate(self.first), QDate(self.last))
+        cal.setGridVisible(True)
+        try:
+            current = parse_date(self.text(), self.first.year) if self.text().strip() else None
+        except ValueError:
+            current = None
+        start = current or min(max(dt.date.today(), self.first), self.last)
+        cal.setSelectedDate(QDate(start))
+
+        def choose(qdate: QDate) -> None:
+            self.setText(qdate.toPython().strftime("%m/%d/%Y"))
+            menu.close()
+            self.picked.emit()
+
+        cal.clicked.connect(choose)
+        cal.activated.connect(choose)
+        holder = QWidgetAction(menu)
+        holder.setDefaultWidget(cal)
+        menu.addAction(holder)
+        self.calendar = menu  # for tests
+        menu.popup(self.mapToGlobal(self.rect().bottomLeft()))
+        cal.setFocus()
+
+
+class DateDelegate(QStyledItemDelegate):
+    """Edits the register's date column with a ``DateEdit``."""
+
+    def __init__(self, register: "Register") -> None:
+        super().__init__(register.table)
+        self.register = register
+
+    def createEditor(self, parent, option, index):  # noqa: N802 (Qt name)
+        first, last = self.register.calendar_range
+        editor = DateEdit(parent, first, last)
+        editor.picked.connect(lambda: (self.commitData.emit(editor), self.closeEditor.emit(editor)))
+        return editor
+
+    def setEditorData(self, editor, index) -> None:  # noqa: N802
+        editor.setText(index.data() or "")
+
+    def setModelData(self, editor, model, index) -> None:  # noqa: N802
+        model.setData(index, editor.text())
 
 
 def amount_edit(tip: str = AMOUNT_TIP) -> QLineEdit:
@@ -73,6 +165,12 @@ def amount_edit(tip: str = AMOUNT_TIP) -> QLineEdit:
     edit.setToolTip(tip)
     edit.setMaximumWidth(180)
     return edit
+
+
+def _mark_error(item: QTableWidgetItem, error: bool) -> None:
+    """Light red with dark text for a mistake; the theme's colors otherwise."""
+    item.setBackground(QBrush(QColor(ERROR_BACKGROUND)) if error else QBrush())
+    item.setForeground(QBrush(QColor(ERROR_TEXT)) if error else QBrush())
 
 
 class Register(QWidget):
@@ -94,8 +192,13 @@ class Register(QWidget):
             "One row per amount. Date: MM/DD/YYYY, or MM/DD in the tax year.\n"
             "Amount: a number or simple arithmetic, such as 3662.90*12.\n"
             "Type in the blank last row to add one.")
-        self.table.setMinimumHeight(160)
-        self.table.verticalHeader().setDefaultSectionSize(self.fontMetrics().height() + 8)
+        row_height = self.fontMetrics().height() + 8
+        self.table.verticalHeader().setDefaultSectionSize(row_height)
+        # Room for the header and four rows; the table grows with the panel.
+        self.table.setMinimumHeight(5 * row_height + 4)
+        self.table.setMinimumWidth(240)
+        self.calendar_range = (dt.date(self.year, 1, 1), dt.date(self.year, 12, 31))
+        self.table.setItemDelegateForColumn(0, DateDelegate(self))
         self.table.itemChanged.connect(self._item_changed)
         self.delete_btn = QPushButton("&Remove row")
         self.delete_btn.setToolTip("Remove the selected register rows")
@@ -112,17 +215,20 @@ class Register(QWidget):
         buttons.addStretch(1)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.addLayout(buttons)  # above the table, so they stay on short screens
         lay.addWidget(self.table, 1)
-        lay.addLayout(buttons)
         lay.addWidget(self.total)
         lay.addWidget(self.warning)
         self.window_dates: tuple[dt.date, dt.date] | None = None
         self.window_text = ""
 
-    def set_entries(self, entries: list[Entry], year: int, valid: tuple[dt.date, dt.date], what: str) -> None:
+    def set_entries(self, entries: list[Entry], year: int, valid: tuple[dt.date, dt.date], what: str,
+                    calendar: tuple[dt.date, dt.date] | None = None) -> None:
         """Show ``entries`` (edited in place). ``valid`` is the first and last
-        date that counts on the worksheet; ``what`` says why, for the warning."""
+        date that counts on the worksheet; ``what`` says why, for the warning.
+        ``calendar``: the dates the date picker offers (default: the year)."""
         self.entries, self.year = entries, year
+        self.calendar_range = calendar or (dt.date(year, 1, 1), dt.date(year, 12, 31))
         self.window_dates, self.window_text = valid, what
         self._fill()
 
@@ -161,20 +267,20 @@ class Register(QWidget):
             day = parse_date(date_text, self.year) if date_text.strip() else None
         except ValueError as exc:
             day, problem = None, str(exc)
-            date_item.setBackground(QBrush(QColor("#f5b7b1")))
+            _mark_error(date_item, True)
         else:
             if date_item:
-                date_item.setBackground(QBrush())
+                _mark_error(date_item, False)
                 if day is not None:
                     date_item.setText(day.strftime("%m/%d/%Y"))
         try:
             value = evaluate_amount(amount_text) if amount_text.strip() else None
         except ValueError as exc:
             value, problem = None, str(exc)
-            amount_item.setBackground(QBrush(QColor("#f5b7b1")))
+            _mark_error(amount_item, True)
         else:
             if amount_item:
-                amount_item.setBackground(QBrush())
+                _mark_error(amount_item, False)
                 amount_item.setToolTip(f"{amount_text} = {money(value)}" if value is not None else "")
         self.table.blockSignals(False)
         if problem:
@@ -245,6 +351,8 @@ class ProfilePage(QWidget):
                               "estimated payment lines follow its own schedule.")
         form.addRow("&State", self.state)
         self.people_boxes: list[tuple[QGroupBox, QLineEdit, SpinBox, QCheckBox, ComboBox]] = []
+        self.ages: list[QLabel] = []
+        self.tax_year = dt.date.today().year
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addLayout(form)
@@ -254,6 +362,9 @@ class ProfilePage(QWidget):
             name = QLineEdit()
             birth = SpinBox()
             birth.setRange(1900, 2100)
+            birth.setMaximumWidth(80)
+            age = QLabel()
+            age.setAccessibleName("Calculated age")
             blind = QCheckBox()
             medicare = ComboBox()
             for text, _ in MEDICARE_CHOICES:
@@ -261,11 +372,14 @@ class ProfilePage(QWidget):
             medicare.setToolTip("Choose Yes for Medicare before 65 (for example on SSDI).")
             f.addRow("Name", name)
             f.addRow("Birth year", birth)
+            f.addRow("", age)
             f.addRow("Blind", blind)
             f.addRow("Medicare Part B", medicare)
             for w, sig in ((name, name.textEdited), (birth, birth.valueChanged), (blind, blind.toggled),
                            (medicare, medicare.currentIndexChanged)):
                 sig.connect(self._store)
+            birth.valueChanged.connect(lambda _v, b=birth, a=age: self._show_age(b, a))
+            self.ages.append(age)
             self.people_boxes.append((box, name, birth, blind, medicare))
             lay.addWidget(box)
         more = compact_form(QFormLayout())
@@ -292,8 +406,13 @@ class ProfilePage(QWidget):
         self.prior_tax.textEdited.connect(self._store)
         self.prior_agi.textEdited.connect(self._store)
 
+    def _show_age(self, birth: SpinBox, label: QLabel) -> None:
+        """As in RTPL's profile: the age the IRS uses for the year's tests."""
+        label.setText(f"Age {self.tax_year - birth.value()} at end of {self.tax_year}")
+
     def set_year(self, ty: TaxYear) -> None:
         self.ty = None
+        self.tax_year = ty.year
         p = ty.profile
         self.status.setCurrentIndex(max(0, self.status.findData(p.filing_status)))
         self.state.setCurrentIndex(max(0, self.state.findData(p.state)))
@@ -303,6 +422,7 @@ class ProfilePage(QWidget):
             birth.setValue(person.birth_year)
             blind.setChecked(person.blind)
             medicare.setCurrentIndex([v for _, v in MEDICARE_CHOICES].index(person.medicare_part_b))
+            self._show_age(birth, self.ages[n])
         self.dependents.setText(", ".join(ty.dependents))
         self.prior_tax.setText("" if ty.prior_year_tax is None else f"{ty.prior_year_tax:g}")
         self.prior_agi.setText("" if ty.prior_year_agi is None else f"{ty.prior_year_agi:g}")
@@ -340,7 +460,7 @@ class ProfilePage(QWidget):
                 setattr(ty, attr, evaluate_amount(text) if text else None)
                 edit.setStyleSheet("")
             except ValueError:
-                edit.setStyleSheet("background: #f5b7b1;")
+                edit.setStyleSheet(ERROR_SHEET)
         self.changed.emit()
 
 
@@ -384,9 +504,16 @@ class ItemPage(QWidget):
         self.heading = QLabel()
         self.name = QLineEdit()
         self.name.setAccessibleName("Source name")
+        self.name.setToolTip("Leave blank to show the tax type instead. The person's\n"
+                             "name is added in the tree and on the worksheet.")
         self.tax_type = ComboBox()
         for t in TAX_TYPES:
             self.tax_type.addItem(t.label, t.key)
+        # Size to a short width; the popup list shows the long names in full,
+        # so the panel doesn't widen for "Deductible traditional IRA contribution".
+        for combo in (self.tax_type,):
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+            combo.setMinimumContentsLength(22)
         self.tax_type.setToolTip("How the income or deduction is taxed. Ordinary dividends\n"
                                  "to split use the qualified share below.")
         self.person = ComboBox()
@@ -440,20 +567,25 @@ class ItemPage(QWidget):
         if is_source:
             self.heading.setText("<b>Income source</b>")
             self.name.setText(item.name)
+            self.name.setPlaceholderText(item.type.label)
             self.tax_type.setCurrentIndex(self.tax_type.findData(item.tax_type))
             self.person.setCurrentIndex(max(0, self.person.findData(item.person_index(len(ty.profile.people)))))
             self.share.setValue(100 * (item.qualified_share if item.qualified_share is not None else 0.0))
             valid = (dt.date(ty.year, 1, 1), dt.date(ty.year, 12, 31))
             why = f"income counts in {ty.year} only"
+            calendar = valid
         else:
             self.heading.setText(f"<b>{payment_label(item.key, state_name)}</b>")
             valid = (dt.date(ty.year, 1, 1), dt.date(ty.year + 1, 4, 30))
             why = "a payment counts by the due date it is on or before"
+            # Estimated payments for the last period are made the next January.
+            last = dt.date(ty.year + 1, 1, 31) if item.key.endswith("_estimated") else dt.date(ty.year, 12, 31)
+            calendar = (dt.date(ty.year, 1, 1), last)
         for w in (self.name, self.tax_type, self.person):
             self._row_visible(w, is_source)
         self.plan.setText(item.plan_text)
         self.notes.setPlainText(item.notes)
-        self.register.set_entries(item.entries, ty.year, valid, why)
+        self.register.set_entries(item.entries, ty.year, valid, why, calendar)
         self.item = item
         self._sync_rows()
 
@@ -470,6 +602,7 @@ class ItemPage(QWidget):
         item = self.item
         if isinstance(item, IncomeSource):
             item.tax_type = self.tax_type.currentData()
+            self.name.setPlaceholderText(item.type.label)
             if item.tax_type == "dividends_to_split" and item.qualified_share is None:
                 item.qualified_share = self.share.value() / 100 or 0.75
                 self.share.setValue(item.qualified_share * 100)
@@ -492,13 +625,15 @@ class ItemPage(QWidget):
             self.plan.setStyleSheet("")
             self.plan.setToolTip(f"{text} = {money(evaluate_amount(text))}" if text else AMOUNT_TIP)
         except ValueError:
-            self.plan.setStyleSheet("background: #f5b7b1;")
+            self.plan.setStyleSheet(ERROR_SHEET)
         item.notes = self.notes.toPlainText()
         if isinstance(item, IncomeSource):
             if item.name != self.name.text():
                 item.name = self.name.text()
                 self.renamed.emit()
-            item.person = self.person.currentData()
+            if item.person != self.person.currentData():
+                item.person = self.person.currentData()
+                self.renamed.emit()
             if item.tax_type == "dividends_to_split":
                 item.qualified_share = self.share.value() / 100
         self.changed.emit()
@@ -508,6 +643,7 @@ class EqtaEditor(QWidget):
     """Tree of the year's items, with Add, Clone and Delete, and the editor below."""
 
     changed = Signal()
+    page_changed = Signal()  # another form shows: the panel re-measures its width
 
     def __init__(self, states: list[str], state_name=lambda code, year: code) -> None:
         super().__init__()
@@ -517,7 +653,7 @@ class EqtaEditor(QWidget):
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setAccessibleName("Year items")
-        self.tree.setMinimumHeight(180)
+        self.tree.setMinimumHeight(150)
         self.tree.currentItemChanged.connect(self._selected)
         self.add_btn = QToolButton()
         self.add_btn.setText("&Add")
@@ -548,8 +684,8 @@ class EqtaEditor(QWidget):
             self.stack.addWidget(w)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
+        lay.addLayout(buttons)  # above the tree, as in RTPL's plan items
         lay.addWidget(self.tree)
-        lay.addLayout(buttons)
         lay.addWidget(self.stack, 1)
         self.profile_page.changed.connect(self._profile_changed)
         self.notes_page.changed.connect(self.changed)
@@ -571,7 +707,7 @@ class EqtaEditor(QWidget):
         self.tree.clear()
         if ty is None:
             self.tree.blockSignals(False)
-            self.stack.setCurrentWidget(self.blank)
+            self._show_page(self.blank)
             return
         fixed = []
         for text, kind in (("Profile", "profile"), ("Notes", "notes")):
@@ -595,7 +731,7 @@ class EqtaEditor(QWidget):
             group = QTreeWidgetItem([t.label])
             group.setData(0, ROLE, ("group", t.key))
             for i, s in members:
-                child = QTreeWidgetItem([s.name or "(no name)"])
+                child = QTreeWidgetItem([s.label(ty.profile.people)])
                 child.setData(0, ROLE, ("source", i))
                 group.addChild(child)
             income.addChild(group)
@@ -621,23 +757,23 @@ class EqtaEditor(QWidget):
         self.clone_btn.setEnabled(kind == "source")
         self.delete_btn.setEnabled(kind == "source")
         if ty is None or kind is None:
-            self.stack.setCurrentWidget(self.blank)
+            self._show_page(self.blank)
         elif kind == "profile":
             self.profile_page.set_year(ty)
-            self.stack.setCurrentWidget(self.profile_page)
+            self._show_page(self.profile_page)
         elif kind == "notes":
             self.notes_page.set_year(ty)
-            self.stack.setCurrentWidget(self.notes_page)
+            self._show_page(self.notes_page)
         elif kind == "payment":
             self.item_page.set_item(ty, ty.payments[key], self._state_label())
-            self.stack.setCurrentWidget(self.item_page)
+            self._show_page(self.item_page)
         elif kind == "source":
             self.item_page.set_item(ty, ty.sources[key], self._state_label())
-            self.stack.setCurrentWidget(self.item_page)
+            self._show_page(self.item_page)
         else:
             self.blank.setText("Choose an item above to edit it, or Add an income source."
                                if kind in ("income", "group") else "Choose a payment line to edit its register.")
-            self.stack.setCurrentWidget(self.blank)
+            self._show_page(self.blank)
 
     def current_source_index(self) -> int | None:
         node = self.tree.currentItem()
@@ -656,21 +792,35 @@ class EqtaEditor(QWidget):
         if group is not None and group.data(0, ROLE) != ("group", s.tax_type):
             self._rebuild(select=("source", i))  # moved to another group
         else:
-            node.setText(0, s.name or "(no name)")
+            node.setText(0, s.label(self.ty.profile.people))
 
     def _profile_changed(self) -> None:
         # Names and the state appear in the tree's labels.
         node = self.tree.topLevelItem(2)
         for n, key in enumerate(PAYMENT_LINES):
             node.child(n).setText(0, payment_label(key, self._state_label()))
+        it = QTreeWidgetItemIterator(self.tree)
+        while it.value():
+            kind, key = it.value().data(0, ROLE)
+            if kind == "source":
+                it.value().setText(0, self.ty.sources[key].label(self.ty.profile.people))
+            it += 1
         self.changed.emit()
+
+    def _show_page(self, page: QWidget) -> None:
+        """Show ``page``; only it counts toward the panel's size."""
+        for i in range(self.stack.count()):
+            w = self.stack.widget(i)
+            policy = QSizePolicy.Policy.Preferred if w is page else QSizePolicy.Policy.Ignored
+            w.setSizePolicy(policy, policy)
+        self.stack.setCurrentWidget(page)
+        self.page_changed.emit()
 
     # -- buttons ----------------------------------------------------------
     def add_source(self, tax_type: str) -> None:
         if self.ty is None:
             return
         s = self.eq.new_source(tax_type) if self.eq else IncomeSource(tax_type=tax_type)
-        s.name = f"New {TAX_TYPE[tax_type].label.lower()}"
         if s.type.per_person:
             s.person = 0
         self.ty.sources.append(s)
@@ -684,7 +834,7 @@ class EqtaEditor(QWidget):
         if i is None:
             return
         s = self.ty.sources[i]
-        copy_ = IncomeSource(name=f"{s.name} (copy)", tax_type=s.tax_type, person=s.person,
+        copy_ = IncomeSource(name=f"{s.name} (copy)" if s.name.strip() else "", tax_type=s.tax_type, person=s.person,
                              plan_text=s.plan_text, notes=s.notes, qualified_share=s.qualified_share)
         self.ty.sources.insert(i + 1, copy_)
         self._rebuild(select=("source", i + 1))
@@ -698,7 +848,7 @@ class EqtaEditor(QWidget):
         if confirm and s.entries:
             answer = QMessageBox.question(
                 self, "Delete", textwrap.fill(
-                    f"Delete {s.name or 'this source'} and its {len(s.entries)} register entries?", TIP_WIDTH))
+                    f"Delete {s.label(self.ty.profile.people)} and its {len(s.entries)} register entries?", TIP_WIDTH))
             if answer != QMessageBox.StandardButton.Yes:
                 return
         del self.ty.sources[i]

@@ -156,7 +156,7 @@ class Entry:
 
 @dataclass
 class IncomeSource:
-    name: str = "New source"
+    name: str = ""  # empty: shown by its tax type (see label)
     tax_type: str = "taxable_interest"
     person: int | None = None  # index into the profile's people
     plan_text: str = ""  # annual plan amount, as typed ("" = $0)
@@ -182,6 +182,14 @@ class IncomeSource:
     def total_through(self, end: dt.date, start: dt.date | None = None) -> float:
         """Entries dated from ``start`` (if given) through ``end``."""
         return round(sum(e.amount for e in self.entries if e.date <= end and (start is None or e.date >= start)), 2)
+
+    def label(self, people: list) -> str:
+        """The name shown in the tree and on the worksheet: the source's name,
+        or its tax type when it has none, then " - " and the person's name
+        when it belongs to someone."""
+        text = self.name.strip() or self.type.label
+        idx = self.person_index(len(people))
+        return f"{text} - {people[idx].name}" if idx is not None else text
 
     def to_dict(self) -> dict:
         out = {
