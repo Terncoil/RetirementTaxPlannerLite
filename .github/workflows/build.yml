@@ -13,14 +13,13 @@ name: build apps
 #   "Run workflow" by hand.
 #
 # macOS is built only when the repository variable MACOS_BUILDS is true, or
-# when "Run workflow" is started with macOS ticked, because macOS minutes
-# count ten times against the private-repository Actions allowance. See
-# docs/packaging.md.
+# when "Run workflow" is started with macOS ticked. The repository is
+# public, so set MACOS_BUILDS to true and leave it. See docs/packaging.md.
 on:
   workflow_dispatch:
     inputs:
       macos:
-        description: "Also build for macOS (uses 10x the Actions minutes)"
+        description: "Also build for macOS"
         type: boolean
         default: false
   push:

@@ -1,6 +1,7 @@
 """Opens the main window offscreen and exercises it. Skipped without Qt."""
 
 import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -713,6 +714,9 @@ def test_file_types_item_is_checked_from_the_os(window, monkeypatch):
     from rtpl.app import main_window as mw
 
     action = window.file_types_action
+    if sys.platform == "darwin":
+        assert action is None  # the macOS app bundle registers its own types
+        return
     assert action is not None and action.isCheckable()  # Linux and Windows
     state = {"on": False}
     monkeypatch.setattr(mw, "file_types_registered", lambda: state["on"])
