@@ -30,7 +30,7 @@ def window(tmp_path, monkeypatch):
 def test_main_window_draws(window, tmp_path):
     from rtpl.model.profile import Profile
 
-    path = Path("examples/profiles/retired_couple_ca.json")
+    path = Path("examples/profiles/retired_couple_ca.rtpl")
     window._load_profile(Profile.load(path), path)
     window.recompute()
     assert window.series is not None and window.series.state.code == "CA"
@@ -49,9 +49,9 @@ def test_title_tracks_file_and_changes(window):
 
     assert window.windowTitle().startswith("Untitled[*]")
     assert not window.isWindowModified()
-    path = Path("examples/profiles/retired_couple_ca.json")
+    path = Path("examples/profiles/retired_couple_ca.rtpl")
     window._load_profile(Profile.load(path), path)
-    assert window.windowTitle().startswith("retired_couple_ca.json[*]")
+    assert window.windowTitle().startswith("retired_couple_ca.rtpl[*]")
     window.form.plan_name.setText("Edited")
     assert window.isWindowModified()
     window.setWindowModified(False)
@@ -111,7 +111,7 @@ def test_inflation_and_irmaa_basis_controls(window):
 def test_forward_plan_page(window):
     from rtpl.model.plan import Plan
 
-    path = Path("examples/plans/couple_conversions_inherited.json")
+    path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(path), path)
     view = window.plan_view
     assert view.result is not None and view.result.years
@@ -254,17 +254,17 @@ def test_switching_to_auto_hide_keeps_the_panel_open_until_dismissed(window, whi
 def test_forward_plan_page_does_not_widen_window(window):
     from rtpl.model.plan import Plan
 
-    path = Path("examples/plans/couple_conversions_inherited.json")
+    path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(path), path)
     # The plan page's options scroll instead of setting a minimum width.
     assert window.plan_view.minimumSizeHint().width() <= window.tabs.minimumSizeHint().width() + 40
 
 
 def test_file_open_recognizes_plan_files(window):
-    window.open_file(Path("examples/plans/couple_conversions_inherited.json"))
+    window.open_file(Path("examples/plans/couple_conversions_inherited.rtpl"))
     assert window.plan_view.result is not None
     assert window.pages.currentWidget() is window.plan_view
-    window.open_file(Path("examples/profiles/retired_couple_ca.json"))
+    window.open_file(Path("examples/profiles/retired_couple_ca.rtpl"))
     assert window.plan_view.plan is None and window.form.profile().state == "CA"
 
 
@@ -300,13 +300,13 @@ def test_tooltip_lines_fit_the_smallest_screen(window):
     tips = set()
     for state, year in (("CA", None), ("NC", None), ("WA", None), ("MT", None), ("NH", 2023), ("TN", 2020)):
         # State notes and sources come from the data files.
-        prof = Profile.load(Path("examples/profiles/retired_couple_ca.json"))
+        prof = Profile.load(Path("examples/profiles/retired_couple_ca.rtpl"))
         prof.state = state
         prof.year = year or prof.year
         window._load_profile(prof, None)
         window.recompute()
         tips |= _all_tooltips(window)
-    path = Path("examples/plans/couple_conversions_inherited.json")
+    path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(path), path)
     view = window.plan_view
     view.set_table_columns(list(TABLE_COLUMN_KEYS))
@@ -331,7 +331,7 @@ def test_year_table_hides_a_tooltip_over_a_cell_without_one(window):
 
     from rtpl.model.plan import Plan
 
-    path = Path("examples/plans/couple_conversions_inherited.json")
+    path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(path), path)
     table = window.plan_view.table
     for c in range(table.columnCount()):  # every header explains itself or names itself
@@ -364,7 +364,7 @@ def test_export_report_with_and_without_plan(window, tmp_path):
     from rtpl.model.profile import Profile
     from rtpl.report import write_report
 
-    path = Path("examples/profiles/retired_couple_ca.json")
+    path = Path("examples/profiles/retired_couple_ca.rtpl")
     window._load_profile(Profile.load(path), path)
     window.recompute()
     window.set_theme_mode("dark")  # the report is still drawn in light mode
@@ -375,7 +375,7 @@ def test_export_report_with_and_without_plan(window, tmp_path):
     assert write_report(out, title, sections, charts) == 2
     assert out.read_bytes().startswith(b"%PDF")
 
-    plan_path = Path("examples/plans/couple_conversions_inherited.json")
+    plan_path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(plan_path), plan_path)
     window.recompute()
     title, sections, charts = window.report_contents()
@@ -422,7 +422,7 @@ def test_clicking_a_bar_shows_its_breakdown(window):
 
     from rtpl.model.plan import Plan
 
-    path = Path("examples/plans/couple_conversions_inherited.json")
+    path = Path("examples/plans/couple_conversions_inherited.rtpl")
     window.load_plan(Plan.load(path), path)
     view = window.plan_view
     view.tabs.setCurrentWidget(view.income_canvas)
@@ -468,7 +468,7 @@ def test_clicking_a_bar_shows_its_breakdown(window):
 def test_aca_and_education_fields_round_trip(window, tmp_path):
     from rtpl.model.profile import Profile
 
-    path = Path("examples/profiles/early_retirees_college_aca.json")
+    path = Path("examples/profiles/early_retirees_college_aca.rtpl")
     original = Profile.load(path)
     window._load_profile(original, path)
     window.recompute()
@@ -619,7 +619,7 @@ def test_save_as_offers_rtpl_and_opens_it(window, tmp_path, monkeypatch):
     from rtpl.app import main_window as mw
 
     old = tmp_path / "couple.json"
-    shutil.copy("examples/profiles/retired_couple_ca.json", old)
+    shutil.copy("examples/profiles/retired_couple_ca.rtpl", old)
     window.open_file(old)
     offered = {}
 

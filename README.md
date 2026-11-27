@@ -37,8 +37,8 @@ With [uv](https://docs.astral.sh/uv/) (any OS, including Windows):
 uv sync --extra dev              # creates .venv and installs the app plus pytest
 uv run rtpl                      # opens the desktop app
 uv run pytest                    # runs the tests
-uv run rtpl-chart examples/profiles/retired_couple_ca.json -o chart.png
-uv run rtpl-plan examples/plans/couple_conversions_inherited.json -o income.png --balances balances.png
+uv run rtpl-chart examples/profiles/retired_couple_ca.rtpl -o chart.png
+uv run rtpl-plan examples/plans/couple_conversions_inherited.rtpl -o income.png --balances balances.png
 ```
 
 With plain pip (`.` means "this folder's pyproject.toml", `-e` makes it
@@ -54,8 +54,8 @@ rtpl                             # opens the desktop app
 Or draw a chart without the window:
 
 ```bash
-rtpl-chart examples/profiles/retired_couple_ca.json -o chart.png
-rtpl-chart examples/profiles/retired_couple_ca.json -o chart.svg --source ltcg --mode dark --table
+rtpl-chart examples/profiles/retired_couple_ca.rtpl -o chart.png
+rtpl-chart examples/profiles/retired_couple_ca.rtpl -o chart.svg --source ltcg --mode dark --table
 ```
 
 Run the tests with `pytest`.
@@ -87,7 +87,7 @@ change to `main`.
 ## Forward-looking plans
 
 In the app, use **File > Open** (try
-`examples/plans/couple_conversions_inherited.json`) or **File > New Plan
+`examples/plans/couple_conversions_inherited.rtpl`) or **File > New Plan
 from Profile**, then the **Forward plan** tab. The left panel's **Plan
 items** tab lists the accounts, income, Social Security, strategies (Roth
 conversions, withdrawals, qualified charitable distributions and HSA contributions) and assumptions, each with a bar for the

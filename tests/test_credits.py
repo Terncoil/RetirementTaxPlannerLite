@@ -10,7 +10,7 @@ from rtpl.model.profile import Household, Person, Profile
 
 from conftest import make
 
-EXAMPLE = "examples/profiles/early_retirees_college_aca.json"
+EXAMPLE = "examples/profiles/early_retirees_college_aca.rtpl"
 
 
 def college(year=2026, **household):

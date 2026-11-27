@@ -19,7 +19,7 @@ def rate_at(series, x, key=None):
 @pytest.mark.parametrize("name", ["retired_couple_ca", "early_retiree_aca", "ssdi_under_65"])
 @pytest.mark.parametrize("source", list(IncomeSource))
 def test_layers_add_up_to_total_tax_change(lib, name, source):
-    p = Profile.load(f"examples/profiles/{name}.json")
+    p = Profile.load(f"examples/profiles/{name}.rtpl")
     s = build_marginal_series(p, lib, source=source, x_max=250_000, step=250)
     summed = sum(sum(s.layers[k]) for k in LAYERS) * s.step
     assert summed == pytest.approx(s.results[-1].total_tax - s.baseline.total_tax, abs=1e-6)
@@ -188,14 +188,14 @@ def test_irmaa_labels_show_added_premium_and_footnote(lib):
 
 
 def test_washington_gains_tax_has_its_own_layer(lib):
-    p = Profile.load("examples/profiles/couple_selling_stock_wa.json")
+    p = Profile.load("examples/profiles/couple_selling_stock_wa.rtpl")
     s = build_marginal_series(p, lib, source=IncomeSource.LTCG, x_max=150_000)
     assert rate_at(s, 100_000, "state_cg") == pytest.approx(0.07)
     assert rate_at(s, 100_000, "state") == 0
     assert s.layer_label("state_cg") == "State CG&QD Tax (WA)"
     v = default_visibility(s)
     assert v["state_cg"] and not v["state"]
-    ca = build_marginal_series(Profile.load("examples/profiles/retired_couple_ca.json"), lib, x_max=50_000)
+    ca = build_marginal_series(Profile.load("examples/profiles/retired_couple_ca.rtpl"), lib, x_max=50_000)
     assert not default_visibility(ca)["state_cg"]
 
 
@@ -246,7 +246,7 @@ def test_breakpoints_are_exact_thresholds_not_blended_steps(lib):
 @pytest.mark.parametrize("name", ["retired_couple_ca", "early_retiree_aca", "ssdi_under_65"])
 @pytest.mark.parametrize("source", list(IncomeSource))
 def test_breakpoints_agree_with_the_steps(lib, name, source):
-    p = Profile.load(f"examples/profiles/{name}.json")
+    p = Profile.load(f"examples/profiles/{name}.rtpl")
     s = build_marginal_series(p, lib, source=source, x_max=250_000, step=100)
     bps = s.breakpoints()
     assert bps[0].x == 0
