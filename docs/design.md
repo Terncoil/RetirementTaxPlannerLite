@@ -470,7 +470,7 @@ their life expectancy, a plan-level inflation override becomes the
 baseline's inflation, an income's `growth` becomes a "Fixed %" COLA (or
 "None" at 0%), and the eligible designated beneficiary tick box becomes
 the beneficiary choice. Saving writes version 2. It is saved as JSON; see
-`examples/plans/couple_conversions_inherited.json`. The app's **Forward
+`examples/plans/couple_conversions_inherited.rtpl`. The app's **Forward
 plan** page opens plan files. `rtpl-plan` draws the same graphs and
 writes the year table as CSV.
 
@@ -760,7 +760,7 @@ so on top). Colors match the marginal graph's layers, and IRMAA takes the
 income graph's IRMAA line color. It follows the today's-dollars toggle,
 and the notes give lifetime totals by source. FICA payroll taxes and local
 income taxes are not modeled, so they are not shown.
-`examples/plans/couple_rmd_tax_problem.json` shows the typical shape: a
+`examples/plans/couple_rmd_tax_problem.rtpl` shows the typical shape: a
 low-tax stretch, a jump when RMDs start at 75, and another when the
 survivor files single.
 

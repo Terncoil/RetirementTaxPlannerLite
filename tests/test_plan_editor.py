@@ -9,7 +9,7 @@ import pytest
 from rtpl.engine.forward import run_plan
 from rtpl.model.plan import Account, Plan
 
-PLAN = Path("examples/plans/couple_conversions_inherited.json")
+PLAN = Path("examples/plans/couple_conversions_inherited.rtpl")
 
 
 def test_active_plan_leaves_out_switched_off_items():

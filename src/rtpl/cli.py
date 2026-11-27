@@ -2,7 +2,7 @@
 
 Example::
 
-    rtpl-chart examples/profiles/retired_couple_ca.json -o chart.png --source ltcg
+    rtpl-chart examples/profiles/retired_couple_ca.rtpl -o chart.png --source ltcg
 """
 
 from __future__ import annotations

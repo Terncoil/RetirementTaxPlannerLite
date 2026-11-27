@@ -10,7 +10,7 @@ from rtpl.engine.rmd import default_tables, rmd_start_age
 from rtpl.model.plan import Account, Assumptions, IncomeStream, Plan, PersonPlan, Rule, SocialSecurity, When
 from rtpl.model.profile import Household, Person, Profile
 
-EXAMPLE = Path("examples/plans/couple_conversions_inherited.json")
+EXAMPLE = Path("examples/plans/couple_conversions_inherited.rtpl")
 
 
 def couple(year=2026, births=(1956, 1958), **household):
@@ -326,7 +326,7 @@ def test_taxes_by_source_add_up_and_chart(lib):
     from rtpl.engine.forward import TAX_SOURCES, table_data
     from rtpl.theme import Theme
 
-    res = run_plan(Plan.load(Path("examples/plans/couple_rmd_tax_problem.json")), lib)
+    res = run_plan(Plan.load(Path("examples/plans/couple_rmd_tax_problem.rtpl")), lib)
     assert all(y.shortfall == 0 for y in res.years)
     for y in res.years:
         parts = y.tax_by_source()

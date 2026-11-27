@@ -2,7 +2,7 @@
 
 Example::
 
-    rtpl-plan examples/plans/couple_conversions_inherited.json -o income.png --balances balances.png --taxes taxes.png
+    rtpl-plan examples/plans/couple_conversions_inherited.rtpl -o income.png --balances balances.png --taxes taxes.png
     rtpl-plan plan.json -o income.svg --detail --todays-dollars --csv years.csv
 """
 
