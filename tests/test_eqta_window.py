@@ -72,9 +72,9 @@ def test_worksheet_rows(win):
     assert rows["  Alex SS - Alex"] == ["$7,950", "$13,250", "$21,200", "$29,150", "$31,800"]
     assert rows["  Stock fund (estimated, 80%)"][:2] == ["$960", "$960"]
     assert rows["  Stock fund (estimated, 20%)"][:2] == ["$240", "$240"]
-    dues = [cells for label, cells in row_list(win) if label == "Due date"]
+    dues = [cells for label, cells in row_list(win) if label == "  Due date"]
     assert [d[0] for d in dues] == ["Apr 15, 2026", "May 1, 2026 †"]
-    assert rows["Income through"][0] == "Apr 30 *"
+    assert rows["  Income through"][0] == "Apr 30 *"
     assert "Virginia estimated payments" in " ".join(rows)
     assert rows["  Virginia estimated payments"][0] == "$400"
     notes = win.years.currentWidget().notes.text()
@@ -322,3 +322,15 @@ def test_saved_theme_applies_when_only_the_eqta_window_opens(tmp_path, monkeypat
                 w.close()
                 w.deleteLater()
         app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)
+
+
+def test_paid_totals_head_their_payment_lines(win):
+    win.load(sample(), None)
+    labels = [label for label, _ in row_list(win)]
+    for total, first in (("Federal paid", "  Federal withholding"), ("Virginia paid", "  Virginia withholding")):
+        assert labels.index(first) == labels.index(total) + 1
+    grid = win.years.currentWidget().worksheet
+    r = labels.index("Federal paid")
+    assert grid.item(r, 0).font().bold()
+    guidance = labels[labels.index("Guidance (for information)") + 1:]
+    assert guidance and all(label.startswith("  ") for label in guidance)

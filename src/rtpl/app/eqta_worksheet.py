@@ -100,11 +100,11 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
     lines.append(Line("Federal", [""] * COLUMN_COUNT, "heading"))
     row("Estimated federal tax", ws.federal_tax, "total",
         "Tax on the income so far as if the year ended on that day\n(pay-as-you-go).")
-    row("Due date", [day(d) for d in ws.due_dates] + [""], "info")
+    row("  Due date", [day(d) for d in ws.due_dates] + [""], "info")
+    row("Federal paid", ws.paid_total(("federal_withholding", "federal_estimated")), "total",
+        "Payments dated on or before each due date. The Plan column\nadds up the plan amounts.")
     for key in ("federal_withholding", "federal_estimated"):
         row(f"  {payment_label(key)}", ws.paid[key])
-    row("Federal paid", ws.paid_total(("federal_withholding", "federal_estimated")), "subtotal",
-        "Payments dated on or before each due date. The Plan column\nadds up the plan amounts.")
     row("Federal owed", ws.federal_owed, "total", "Estimated tax less paid. Negative: paid ahead.")
 
     # -- state --------------------------------------------------------------
@@ -117,7 +117,7 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
                      f"columns count income through {', '.join(through[:4])}.")
             through = [t + (f" {m}" if ss.period_differs[i] else "") if i < PERIODS else t
                        for i, t in enumerate(through)]
-            row("Income through", through, "info")
+            row("  Income through", through, "info")
         row(f"Estimated {st.name} tax", ws.state_tax, "total")
         dues = []
         for i in range(PERIODS):
@@ -128,10 +128,10 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
                 dues.append(f"{day(d)} {mark(f'{st.name} due {day(d)}; federal {day(ws.due_dates[i])}.')}")
             else:
                 dues.append(day(d))
-        row("Due date", dues + [""], "info")
+        row("  Due date", dues + [""], "info")
+        row(f"{st.name} paid", ws.paid_total(("state_withholding", "state_estimated")), "total")
         for key in ("state_withholding", "state_estimated"):
             row(f"  {payment_label(key, st.name)}", ws.paid[key])
-        row(f"{st.name} paid", ws.paid_total(("state_withholding", "state_estimated")), "subtotal")
         row(f"{st.name} owed", ws.state_owed, "total")
         if ss.annual_only:
             notes.append(f"{st.name}: one payment, due {day(ss.due_dates[3])}.")
@@ -141,17 +141,17 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
     # -- guidance -----------------------------------------------------------
     lines.append(Line("Guidance (for information)", [""] * COLUMN_COUNT, "heading"))
     rap = ws.required_annual_payment
-    row("Federal required by due date, annualized method", [*ws.annualized_required, None], "guidance",
+    row("  Federal required by due date, annualized method", [*ws.annualized_required, None], "guidance",
         "Form 2210 Schedule AI: income so far annualized, taxed, times\n"
         "22.5%, 45%, 67.5% and 90%, but never more than the regular\n"
         "installments plus what earlier periods left unused.")
-    row("Federal required by due date, regular installments", [*ws.regular_required, rap], "guidance",
+    row("  Federal required by due date, regular installments", [*ws.regular_required, rap], "guidance",
         "The required annual payment in equal shares by each due date.\n"
         "The Plan column shows the whole required annual payment.")
-    row("Federal counted as paid by due date", [*ws.credited, None], "guidance",
+    row("  Federal counted as paid by due date", [*ws.credited, None], "guidance",
         "Estimated payments by their date, plus withholding spread evenly\n"
         "over the due dates, as the IRS counts it for the penalty.")
-    row("Federal short by due date", [*ws.short, None], "guidance")
+    row("  Federal short by due date", [*ws.short, None], "guidance")
     basis = f"90% of this year's tax (${ws.current_tax:,.0f}, from {ws.current_tax_basis})"
     if ws.prior_tax is not None and ws.prior_share is not None:
         basis += (f" or {ws.prior_share:.0%} of last year's (${ws.prior_tax:,.0f}, from {ws.prior_basis})"
@@ -162,10 +162,10 @@ def worksheet_lines(ws: Worksheet) -> tuple[list[Line], list[str]]:
                  f"Four equal payments would be ${rap / 4:,.0f} each.")
     if st is not None and ss is not None and ws.state_annualized_required:
         pcts = "/".join(f"{p:.1%}".replace(".0%", "%") for p in ss.annualized_percentages)
-        row(f"{st.name} required by due date, annualized method", [*ws.state_annualized_required, None],
+        row(f"  {st.name} required by due date, annualized method", [*ws.state_annualized_required, None],
             "guidance", textwrap.fill(f"The state's own percentages ({pcts}) of the annualized tax. "
                                       "State safe-harbor rules aren't modeled yet.", TIP_WIDTH))
-        row(f"{st.name} counted as paid by due date", [*ws.state_credited, None], "guidance")
+        row(f"  {st.name} counted as paid by due date", [*ws.state_credited, None], "guidance")
         notes.extend(st.estimated_payments.notes if st.estimated_payments else ())
     notes.extend(ws.notes)
     return lines, notes
