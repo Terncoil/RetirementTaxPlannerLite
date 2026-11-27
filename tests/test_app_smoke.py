@@ -636,38 +636,74 @@ def test_save_as_offers_rtpl_and_opens_it(window, tmp_path, monkeypatch):
     assert window.windowTitle().startswith("couple.rtpl[*]")
 
     window.new_profile()
-    from rtpl.app.__main__ import DocumentRouter
+    from rtpl.app.windows import AppWindows
 
-    DocumentRouter(window).open(saved, ask=False)
+    windows = AppWindows()
+    windows._rtpl = window
+    windows.open(saved, ask=False)
     assert window.current_path == saved
     assert window.form.profile().state == "CA"
 
 
-def test_eqta_file_waits_for_its_window(window, monkeypatch):
-    from rtpl.app import __main__ as entry
+def test_files_go_to_the_window_for_their_type(window, monkeypatch, tmp_path):
+    from rtpl.app.windows import AppWindows
 
+    windows = AppWindows(window.library)
+    windows._rtpl = window
+    window.windows = windows
+    windows.add_window_menu(window)  # as the app does for the windows it makes
     shown = []
     monkeypatch.setattr(QtWidgets.QMessageBox, "information", lambda *a: shown.append(a[2]))
     opened = []
     monkeypatch.setattr(window, "open_file", opened.append)
-    router = entry.DocumentRouter(window)
-    router.open(Path("2026.eqta"))
-    assert opened == [] and "later version" in shown[0]
-    router.open(Path("plan.rtpl"), ask=False)
+    windows.open(Path("plan.rtpl"), ask=False)
     assert opened == [Path("plan.rtpl")]
+    windows.open(Path("notes.txt"))
+    assert "opens .rtpl, .json and .eqta" in shown[0]
+    assert windows.eqta_window(create=False) is None
+    eqta = windows.eqta_window()
+    try:
+        got = []
+        monkeypatch.setattr(eqta, "open_file", got.append)
+        windows.open(Path("2026.eqta"), ask=False)
+        assert got == [Path("2026.eqta")] and opened == [Path("plan.rtpl")]
+        monkeypatch.undo()
+        # Picking an .eqta file in the RTPL window hands it to the EQTA window.
+        from rtpl.model.eqta import EqtaFile
+
+        path = tmp_path / "taxes.eqta"
+        eq = EqtaFile()
+        eq.new_year(2026, "Plan")
+        eq.save(path)
+        window.open_file(path)
+        assert eqta.path == path and eqta.years.tabText(0) == "2026 · Plan"
+        # Both windows have a Window menu with both items.
+        for win in (window, eqta):
+            items = [a.text() for a in win.window_menu.actions()]
+            assert items == ["&RTPL: Marginal and Forward Graphs", "&EQTA: Estimated Quarterly Taxes"]
+            titles = [a.text() for a in win.menuBar().actions()]
+            assert "&Window" in titles
+        assert [a.text() for a in window.menuBar().actions()][-2:] == ["&Window", "&Help"]
+    finally:
+        eqta.setWindowModified(False)
+        eqta.close()
+        eqta.deleteLater()
 
 
 def test_macos_file_open_event_reaches_the_window(window, monkeypatch):
     """Finder sends a file-open event to the running app instead of argv."""
     from PySide6.QtGui import QFileOpenEvent
 
-    from rtpl.app.__main__ import DocumentRouter, application_class
+    from rtpl.app.__main__ import application_class
+    from rtpl.app.windows import AppWindows
 
     cls = application_class()
     opened = []
     monkeypatch.setattr(window, "open_from_os", opened.append)
+    windows = AppWindows(window.library)
+    windows._rtpl = window
     # The running QApplication is the test's own, so call the handler directly.
-    fake = type("App", (), {"router": DocumentRouter(window), "pending": []})()
+    fake = type("App", (), {"router": windows, "pending": []})()
     cls.event(fake, QFileOpenEvent("/tmp/x.rtpl"))
     assert opened == [Path("/tmp/x.rtpl")]
 

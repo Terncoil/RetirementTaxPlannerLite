@@ -16,7 +16,7 @@ def test_icon_files_ship():
 def test_desktop_entry_quotes_paths():
     text = shortcut.desktop_entry("/home/me/my venv/bin/rtpl", [], "/x/rtpl_256.png")
     assert 'Exec="/home/me/my venv/bin/rtpl" %f\n' in text
-    assert "MimeType=application/x-rtpl;\n" in text
+    assert "MimeType=application/x-rtpl;application/x-eqta;\n" in text
     assert "Icon=/x/rtpl_256.png\n" in text
     assert f"StartupWMClass={icon.DESKTOP_FILE_NAME}\n" in text
 

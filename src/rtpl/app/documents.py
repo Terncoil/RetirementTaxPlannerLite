@@ -1,9 +1,9 @@
 """The app's file types, and which window opens each one.
 
 RTPL profiles and plans are saved as ``.rtpl`` files (JSON inside). Older
-``.json`` files still open. The Estimated Quarterly Tax Assistant will add
-``.eqta`` files with a window of their own; until then ``WINDOW_FOR_SUFFIX``
-routes them to a message instead.
+``.json`` files still open. The Estimated Quarterly Tax Assistant saves
+``.eqta`` files (JSON too), which open in a window of their own;
+``WINDOW_FOR_SUFFIX`` says which window opens each type.
 
 The packaging files register the types in ``DOCUMENT_TYPES`` with each OS so
 that double-clicking a file starts the app with its path on the command line
@@ -34,12 +34,14 @@ WINDOW_FOR_SUFFIX = {
     ".json": WINDOW_RTPL,  # files saved before the .rtpl extension
     EQTA_SUFFIX: WINDOW_EQTA,
 }
-# Window kinds this version can open. The EQTA window is still to come.
-READY_WINDOWS = {WINDOW_RTPL}
+# Window kinds this version can open.
+READY_WINDOWS = {WINDOW_RTPL, WINDOW_EQTA}
 
 # File dialog filters for the RTPL window.
 OPEN_FILTER = "Profiles and plans (*.rtpl *.json);;All files (*)"
 SAVE_FILTER = "RetirementTaxPlannerLite files (*.rtpl);;JSON (*.json)"
+# ... and for the EQTA window.
+EQTA_FILTER = "Estimated tax files (*.eqta);;All files (*)"
 
 
 @dataclass(frozen=True)
@@ -61,7 +63,13 @@ DOCUMENT_TYPES: tuple[DocumentType, ...] = (
         prog_id="RetirementTaxPlannerLite.rtpl",
         uti="io.github.magixdragon.rtpl.document",
     ),
-    # The .eqta type joins here once the EQTA window can open it.
+    DocumentType(
+        suffix=EQTA_SUFFIX,
+        description="Estimated Quarterly Tax Assistant file",
+        mime_type="application/x-eqta",
+        prog_id="RetirementTaxPlannerLite.eqta",
+        uti="io.github.magixdragon.eqta.document",
+    ),
 )
 
 
@@ -102,6 +110,14 @@ def with_rtpl_suffix(path: Path) -> Path:
     if path.suffix.lower() in (RTPL_SUFFIX, ".json"):
         return path
     return path.with_name(path.name + RTPL_SUFFIX)
+
+
+def with_eqta_suffix(path: Path) -> Path:
+    """``path`` with ``.eqta`` added unless it already ends in .eqta."""
+    path = Path(path)
+    if path.suffix.lower() == EQTA_SUFFIX:
+        return path
+    return path.with_name(path.name + EQTA_SUFFIX)
 
 
 def save_as_start(path: Path | None, fallback: str) -> str:

@@ -50,7 +50,9 @@ from rtpl.app.documents import (
     OPEN_FILTER,
     RTPL_SUFFIX,
     SAVE_FILTER,
+    WINDOW_EQTA,
     save_as_start,
+    window_for,
     with_rtpl_suffix,
 )
 from rtpl.app.icon import about_pixmap
@@ -117,6 +119,44 @@ class AppStyle(QProxyStyle):
             painter.restore()
             return
         super().drawControl(element, option, painter, widget)
+
+
+_theme_mode = {"effective": "light"}  # the mode apply_app_theme last set
+THEME_MODES = (("&System theme", "system"), ("&Light mode", "light"), ("&Dark mode", "dark"))
+
+
+def _view_settings() -> QSettings:
+    return QSettings(str(config_dir() / "window.ini"), QSettings.Format.IniFormat)
+
+
+def saved_theme_mode() -> str:
+    """The View menu's theme (system, light or dark), the same for both windows."""
+    mode = _view_settings().value("view/theme", "system")
+    return mode if mode in ("system", "light", "dark") else "system"
+
+
+def save_theme_mode(mode: str) -> None:
+    settings = _view_settings()
+    settings.setValue("view/theme", mode)
+    settings.sync()
+
+
+def sync_title_bar(window: QWidget) -> None:
+    """Windows 10 and 11 draw a window's title bar light unless the app asks
+    for a dark one, and Qt only asks for windows made while the system is in
+    dark mode. Ask for every window, after it is shown, to match the app's
+    theme. Elsewhere the window manager draws the title bar: nothing to do."""
+    if sys.platform != "win32" or not window.testAttribute(Qt.WidgetAttribute.WA_WState_Created):
+        return
+    import ctypes
+
+    dark = ctypes.c_int(1 if _theme_mode["effective"] == "dark" else 0)
+    hwnd = ctypes.c_void_p(int(window.winId()))
+    dwm = ctypes.windll.dwmapi
+    # DWMWA_USE_IMMERSIVE_DARK_MODE is 20, or 19 before Windows 10 20H1.
+    for attribute in (20, 19):
+        if dwm.DwmSetWindowAttribute(hwnd, attribute, ctypes.byref(dark), ctypes.sizeof(dark)) == 0:
+            break
 
 
 def apply_app_theme(app: QApplication, mode: str) -> str:
@@ -197,6 +237,10 @@ def apply_app_theme(app: QApplication, mode: str) -> str:
         if sheet:
             widget.setStyleSheet("")
             widget.setStyleSheet(sheet)
+    _theme_mode["effective"] = mode
+    for widget in app.topLevelWidgets():
+        if isinstance(widget, QMainWindow):
+            sync_title_bar(widget)
     return mode
 
 
@@ -356,9 +400,10 @@ class MainWindow(QMainWindow):
         self.theme_path = config_dir() / "theme.toml"
         self.theme = Theme.load(self.theme_path)
         self.new_defaults_path = config_dir() / "new_profile.json"
-        self.theme_mode = "system"
+        self.theme_mode = saved_theme_mode()
         self.effective_mode = "light"
         self.current_path: Path | None = None
+        self.windows = None  # the app's window manager (rtpl.app.windows), when there is one
         self.series: MarginalSeries | None = None
         self.overrides: dict[str, bool] = {}  # user's explicit layer choices
 
@@ -720,11 +765,13 @@ class MainWindow(QMainWindow):
         v = self.menuBar().addMenu("&View")
         v.setToolTipsVisible(True)
         group = QActionGroup(self)
-        for text, mode in (("&System theme", "system"), ("&Light mode", "light"), ("&Dark mode", "dark")):
-            act = QAction(text, self, checkable=True, checked=mode == "system")
+        self.theme_actions = {}
+        for text, mode in THEME_MODES:
+            act = QAction(text, self, checkable=True, checked=mode == self.theme_mode)
             act.triggered.connect(lambda _=False, md=mode: self.set_theme_mode(md))
             group.addAction(act)
             v.addAction(act)
+            self.theme_actions[mode] = act
         v.addSeparator()
         v.addAction(self.inputs_action)
         v.addAction(self.options_action)
@@ -735,14 +782,15 @@ class MainWindow(QMainWindow):
         defaults.setToolTip("Choose the values File > New starts from, such as filing status,\n"
                             "state, inflation and Social Security")
         v.addAction(defaults)
-        # Ticked while the OS opens .rtpl files with this copy of the app; it
+        # Ticked while the OS opens .rtpl and .eqta files with this copy of the app; it
         # reads the OS each time the menu opens. macOS: the bundle does it.
         self.file_types_action = None
         if can_register_file_types():
             v.addSeparator()
-            self.file_types_action = QAction("Open .rtpl Files With &This App", self, checkable=True)
+            self.file_types_action = QAction("Open .rtpl and .eqta Files With &This App", self, checkable=True)
             self.file_types_action.setToolTip(
-                "Ticked: double-clicking a .rtpl file opens it in this copy of the app.\n"
+                "Ticked: double-clicking a .rtpl or .eqta file opens it in this copy\n"
+                "of the app.\n"
                 "Untick to stop. If you move the app to another folder, the tick\n"
                 "clears; tick it again")
             self.file_types_action.toggled.connect(self._file_types_toggled)
@@ -866,8 +914,17 @@ class MainWindow(QMainWindow):
                 self.table.setItem(r, c, item)
 
     def set_theme_mode(self, mode: str) -> None:
-        self.theme_mode = mode
-        self.effective_mode = apply_app_theme(QApplication.instance(), mode)
+        """View > System theme, Light mode or Dark mode: remembered, and the
+        same in both windows."""
+        if self.windows is not None:
+            self.windows.set_theme(mode)
+            return
+        save_theme_mode(mode)
+        self.theme_changed(mode, apply_app_theme(QApplication.instance(), mode))
+
+    def theme_changed(self, mode: str, effective: str) -> None:
+        self.theme_mode, self.effective_mode = mode, effective
+        self.theme_actions[mode].setChecked(True)
         self.redraw()
 
     def edit_colors(self) -> None:
@@ -925,10 +982,8 @@ class MainWindow(QMainWindow):
 
     def open_document(self) -> None:
         """File > Open: a profile or a plan, whichever the file holds."""
-        if not self.maybe_save():
-            return
         path, _ = QFileDialog.getOpenFileName(self, "Open", "", OPEN_FILTER)
-        if path:
+        if path and (window_for(Path(path)) == WINDOW_EQTA or self.maybe_save()):
             self.open_file(Path(path))
 
     def open_from_os(self, path: Path) -> None:
@@ -957,7 +1012,7 @@ class MainWindow(QMainWindow):
             else:
                 unregister_file_types()
         except (OSError, RuntimeError) as exc:
-            QMessageBox.warning(self, APP_NAME, f"Could not change the .rtpl file type:\n{exc}")
+            QMessageBox.warning(self, APP_NAME, f"Could not change the .rtpl and .eqta file types:\n{exc}")
         self.refresh_file_types_action()
         if checked and not self.file_types_action.isChecked() and sys.platform == "win32":
             QMessageBox.information(
@@ -968,6 +1023,12 @@ class MainWindow(QMainWindow):
 
     def open_file(self, path: Path) -> None:
         """Open a profile or a plan; a plan file is recognized by its "profile" section."""
+        if window_for(path) == WINDOW_EQTA:
+            if self.windows is not None:
+                self.windows.open(path)  # the EQTA window opens it
+            else:
+                QMessageBox.warning(self, "Open", f"{path.name} is an estimated tax file; open it from the EQTA window.")
+            return
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if isinstance(data, dict) and "profile" in data:

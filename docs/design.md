@@ -41,7 +41,9 @@ src/rtpl/
   charts/marginal_chart.py  render_marginal() onto any matplotlib Figure
   charts/forward_chart.py   render_income(), render_balances()
   theme.py                light/dark palettes from TOML
-  app/                    Qt main window and profile form
+  model/eqta.py           Estimated Quarterly Tax Assistant files (.eqta)
+  engine/estimated.py     EQTA worksheet: tax, paid, owed and guidance by period
+  app/                    Qt windows (RTPL and EQTA) and their forms
   cli.py                  headless marginal chart export (rtpl-chart)
   plan_cli.py             headless plan export: graphs and CSV (rtpl-plan)
   data/federal/*.toml     per-year federal law + projection rules
@@ -215,6 +217,11 @@ year the state taxes any income has an `[estimated_payments]` table
   year that falls back to the file uses the `due` rule again, and the
   projected federal years drop it.
 * `notes`: annotations for EQTA, such as who must pay.
+* `[estimated_payments.safe_harbor]` (federal files only): the shares of
+  this year's and last year's tax that avoid the underpayment penalty
+  (90%, 100%, or 110% when last year's AGI was over `high_income_agi`),
+  and `penalty_floor`, the balance after withholding under which no
+  penalty applies ($1,000). Fixed in statute, so projected years keep them.
 
 `period_ends(year)` gives the last day of income each installment
 covers, `due_dates(year)` each installment's date (None when nothing is
@@ -336,6 +343,77 @@ of the rate:
 | IRMAA | someone is on Medicare by the premium year (age 63+ now, or Part B enrolled) |
 | ACA | the household buys marketplace coverage and someone is under 65 and not on Medicare |
 | State tax cliffs | the graph has one |
+
+## Estimated Quarterly Tax Assistant
+
+A second kind of window (`app/eqta_window.py`) for paying tax as you go,
+in the same program and process as the RTPL window. `app/windows.py`
+makes each window when first needed, routes each file by its extension
+and adds a Window menu to both (Ctrl+Alt+1 RTPL, Ctrl+Alt+2 EQTA).
+
+**File** (`model/eqta.py`, `.eqta`, JSON with `"kind": "eqta"`): New
+Year Defaults (the qualified share for new ordinary-dividend sources, and
+whether Clone Year keeps each source's share or sets it to a percentage),
+then the years. Each year has a tax year, a description, RTPL's `Profile`
+(filing status, state and people; the income fields are filled from the
+registers), dependents (a tag only), last year's tax and AGI if typed,
+notes, the income sources and the four payment lines. An income source has
+a name, a tax type, an optional person, an annual plan amount, notes, a
+qualified share (dividends to split only) and a register of date and amount
+rows. Amounts are stored as typed (`3662.90*12`) and evaluated with
+`evaluate_amount`: numbers, `+ - * /` and parentheses only.
+
+Tax types and the profile field each fills: Social Security, wages,
+pension and IRA distributions go to the person (the first person when
+none is chosen, since state exclusions and Social Security are per
+person); taxable and tax-exempt interest, qualified and non-qualified
+dividends, long- and short-term gains (negative allowed, netted as
+Schedule D does), other ordinary income, HSA contributions
+(`hsa_deduction`), deductible IRA contributions and other above-the-line
+deductions (`adjustments`), charitable gifts (the non-itemizer deduction)
+and itemized deductions go to the household. Ordinary dividends to split
+go to qualified and non-qualified dividends by the source's share, and
+show in both groups on the worksheet, marked as estimated.
+
+**Worksheet** (`engine/estimated.py`): each column runs `compute_tax` on
+the year's profile with each source totalled through the column's date.
+
+* Income counts when dated on or before the period end: March 31, May 31,
+  August 31, December 31. The state lines use the state's own period ends
+  (Virginia's first period ends April 30), so the state tax for that
+  column is on income through April 30.
+* Estimated tax: the tax on that income as if the year ended then.
+* Paid: each payment register through the period's due date (the state's
+  own date for the state lines; where the state has no installment for a
+  period, as in California's September, the federal date). Owed is tax
+  less paid. The Plan column uses the plan amounts throughout.
+* The state section shows whenever the year's state taxes any income
+  (`StateLaw.has_any_tax`), Washington's gains-only tax included. A due
+  date that differs from the federal one is marked with a footnote, and an
+  annual-only tax shows one due date.
+
+Guidance, dimmed and for information only:
+
+* Required annual payment: the smaller of 90% of this year's tax (the
+  Plan column when any source has a plan amount, otherwise December 31)
+  and 100% or 110% of last year's (typed in the Profile, or else last
+  year's tab at December 31). Shares and limits come from the federal
+  file's `[estimated_payments.safe_harbor]`.
+* Annualized method (Form 2210 Schedule AI): income through each period
+  end times 12 / months (4, 2.4, 1.5, 1; 3 for Virginia's April 30 state
+  period), taxed with the full standard deduction, times the cumulative
+  percentage (22.5/45/67.5/90). Each required installment is the smaller
+  of that less earlier installments (line 24) and the regular installment
+  plus what earlier periods left unused (lines 25 to 28).
+* Counted as paid: estimated payments by their date, plus withholding
+  spread over the due dates in the schedule's shares (IRC 6654(g)).
+* State: the annualized amount with the state's own percentages
+  (California 27/63/63/90). State safe-harbor rules are not modeled yet.
+
+**Later** (GitHub issue #45): the Marginal chart and Marginal data table
+tabs with the graph options panel, handing a second double-click to the
+running copy, importing the old spreadsheet, CSV import, capital loss
+carryover, state safe harbors.
 
 ## Accessibility and CUA
 

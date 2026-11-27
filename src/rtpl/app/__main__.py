@@ -1,38 +1,15 @@
 """Start the desktop app: ``python -m rtpl.app`` or ``rtpl``.
 
 Files named on the command line open at start-up; that is how a
-double-clicked ``.rtpl`` file reaches the app on Windows and Linux. macOS
-sends a file-open event instead, which the application passes on too.
+double-clicked ``.rtpl`` or ``.eqta`` file reaches the app on Windows and
+Linux. macOS sends a file-open event instead, which the application passes
+on too. ``rtpl.app.windows.AppWindows`` sends each file to its window.
 """
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-
-
-class DocumentRouter:
-    """Sends each file to the window for its type."""
-
-    def __init__(self, rtpl_window) -> None:
-        self.rtpl_window = rtpl_window
-
-    def open(self, path: Path, ask: bool = True) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        from rtpl.app.documents import READY_WINDOWS, WINDOW_EQTA, window_for
-
-        kind = window_for(path)
-        if kind not in READY_WINDOWS:
-            # The EQTA window is still to come (GitHub issue #45).
-            what = ("Estimated tax files (.eqta) open in a later version of the app."
-                    if kind == WINDOW_EQTA else "This app opens .rtpl and .json files only.")
-            QMessageBox.information(self.rtpl_window, "Open", f"Could not open {path.name}.\n{what}")
-            return
-        if ask:
-            self.rtpl_window.open_from_os(path)
-        else:
-            self.rtpl_window.open_file(path)
 
 
 def application_class():
@@ -43,7 +20,7 @@ def application_class():
     class Application(QApplication):
         def __init__(self, argv: list[str]) -> None:
             super().__init__(argv)
-            self.router: DocumentRouter | None = None
+            self.router = None  # rtpl.app.windows.AppWindows, once ready
             self.pending: list[Path] = []  # files sent before the window is ready
 
         def event(self, event) -> bool:
@@ -60,26 +37,31 @@ def application_class():
 
 
 def main() -> int:
-    from rtpl.app.documents import files_from_args
+    from rtpl.app.documents import WINDOW_EQTA, files_from_args, window_for
     from rtpl.app.icon import install_app_icon, set_windows_app_id
-    from rtpl.app.main_window import APP_NAME, MainWindow, apply_app_theme
+    from rtpl.app.main_window import APP_NAME
+    from rtpl.app.windows import AppWindows
 
     set_windows_app_id()
     app = application_class()(sys.argv)
     app.setApplicationName(APP_NAME)
     app.setOrganizationName(APP_NAME)
     install_app_icon(app)
-    window = MainWindow()
-    window.effective_mode = apply_app_theme(app, "system")
-    window.redraw()
-    window.resize_to_screen()
-    app.router = DocumentRouter(window)
-    window.show()
+    windows = AppWindows()
     # Qt has taken its own options out of app.arguments(); the rest are files.
-    # Only one profile or plan is open at a time, so the first one wins.
     files = files_from_args(app.arguments()[1:]) + app.pending
-    if files:
-        app.router.open(files[0], ask=False)
+    # An .eqta file opens the EQTA window alone; anything else starts with
+    # the RTPL window. Each window holds one file, so the first of each kind wins.
+    first = files[0] if files else None
+    if first is None or window_for(first) != WINDOW_EQTA:
+        windows.show_rtpl()
+    app.router = windows
+    seen = set()
+    for path in files:
+        kind = window_for(path)
+        if kind not in seen:
+            seen.add(kind)
+            windows.open(path, ask=False)
     return app.exec()
 
 

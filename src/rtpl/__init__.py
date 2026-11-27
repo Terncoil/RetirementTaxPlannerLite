@@ -2,4 +2,4 @@
 
 # The one place the version is set. Raise it in every pull request that
 # changes the app (see docs/packaging.md); GitHub then publishes a release.
-__version__ = "0.20.0"
+__version__ = "0.21.0"

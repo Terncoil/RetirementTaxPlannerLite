@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install a PyInstaller Linux build for the current user, with menu entry,
-# icons and the .rtpl file type (so double-clicking a file opens it).
+# icons and the .rtpl and .eqta file types (so double-clicking a file opens it).
 # Run from the repository root after building:
 #   sh packaging/linux/install.sh
 set -e
@@ -18,6 +18,6 @@ sed "s|^Exec=[^ ]*|Exec=\"$DEST/$APP/$APP\"|" packaging/linux/rtpl.desktop > "$D
 cp packaging/linux/rtpl-mime.xml "$DEST/mime/packages/rtpl.xml"
 command -v update-mime-database >/dev/null && update-mime-database "$DEST/mime" || true
 command -v update-desktop-database >/dev/null && update-desktop-database "$DEST/applications" || true
-command -v xdg-mime >/dev/null && xdg-mime default rtpl.desktop application/x-rtpl || true
+command -v xdg-mime >/dev/null && xdg-mime default rtpl.desktop application/x-rtpl application/x-eqta || true
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q "$DEST/icons/hicolor" || true
-echo "Installed $APP. It is in your applications menu, and .rtpl files open in it."
+echo "Installed $APP. It is in your applications menu, and .rtpl and .eqta files open in it."
