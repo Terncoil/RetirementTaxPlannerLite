@@ -381,3 +381,18 @@ def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
     ed.tree.setCurrentItem(ed._find(("profile", None)))
     ed.tree.setCurrentItem(ed._find(("file_notes", None)))
     assert page.text.toPlainText() == "Keep the HSA receipts"
+
+
+@pytest.mark.parametrize("text", [
+    "a **bold** and *italic* x", "***both*** end", "**Keep**the", "a\\*b\\_c 5\\*3 \\[x\\]",
+    "\\- not a list", "\\# not a heading\n\n2\\. not a list", "line1\n\nline2", "back\\\\slash",
+])
+def test_notes_markdown_round_trips(win, text):
+    from PySide6.QtWidgets import QTextEdit
+
+    from rtpl.app.eqta_editor import document_markdown
+
+    a, b = QTextEdit(), QTextEdit()
+    a.setMarkdown(text)
+    b.setMarkdown(document_markdown(a.document()))
+    assert b.toHtml() == a.toHtml()

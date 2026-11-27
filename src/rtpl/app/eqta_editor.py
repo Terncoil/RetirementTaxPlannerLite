@@ -10,6 +10,7 @@ with ``changed`` so the worksheet can recalculate.
 from __future__ import annotations
 
 import datetime as dt
+import re
 import textwrap
 
 from PySide6.QtCore import QDate, Qt, Signal
@@ -476,6 +477,53 @@ class ProfilePage(QWidget):
         self.changed.emit()
 
 
+_MD_SPECIAL = re.compile(r"([\\`*_\[\]<>~|])")
+_MD_LINE_START = re.compile(r"^(\s*)([#>+=-])")
+_MD_NUMBERED = re.compile(r"^(\s*\d+)([.)])")
+
+
+def _md_escape(text: str) -> str:
+    return _MD_SPECIAL.sub(r"\\\1", text)
+
+
+def document_markdown(doc) -> str:
+    """The text as Markdown with only bold and italic.
+
+    ``QTextDocument.toMarkdown`` decides bold from the font actually found
+    on the system, so it drops bold where no bold face is installed (as on
+    a test machine); this reads the character formats instead.
+    """
+    paragraphs = []
+    block = doc.begin()
+    while block.isValid():
+        runs: list[list] = []  # [bold, italic, text]
+        it = block.begin()
+        while not it.atEnd():
+            frag = it.fragment()
+            fmt = frag.charFormat()
+            style = [fmt.fontWeight() >= QFont.Weight.Bold, fmt.fontItalic()]
+            if runs and runs[-1][:2] == style:
+                runs[-1][2] += frag.text()
+            else:
+                runs.append([*style, frag.text()])
+            it += 1
+        out = []
+        for bold, italic, text in runs:
+            lines = [_md_escape(t) for t in text.split("\u2028")]  # Shift+Enter
+            text = "\\\n".join(lines)
+            mark = ("**" if bold else "") + ("*" if italic else "")
+            core = text.strip()
+            if mark and core:
+                lead = text[: len(text) - len(text.lstrip())]
+                trail = text[len(text.rstrip()):]
+                text = f"{lead}{mark}{core}{mark[::-1]}{trail}"
+            out.append(text)
+        text = _MD_LINE_START.sub(r"\1\\\2", "".join(out))
+        paragraphs.append(_MD_NUMBERED.sub(r"\1\\\2", text))
+        block = block.next()
+    return "\n\n".join(paragraphs).strip()
+
+
 class NotesEdit(QWidget):
     """A notes box with simple formatting (bold and italic), kept as Markdown.
 
@@ -546,7 +594,7 @@ class NotesEdit(QWidget):
         self._loading = False
 
     def markdown(self) -> str:
-        return self.text.toMarkdown().strip()
+        return document_markdown(self.text.document())
 
     def _changed(self) -> None:
         if not self._loading:
