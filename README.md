@@ -150,7 +150,11 @@ is owed. The state lines follow the state's own schedule (Virginia's first
 period runs to April 30; California's installments are 30/40/0/30).
 Dimmed guidance lines show the annualized method (Form 2210 Schedule AI)
 and the regular safe-harbor installments. **Calculation detail** shows the
-steps behind each column. Whole-dollar amounts round 50 cents up, as the
+steps behind each column. **Marginal chart** and **Marginal data table**
+are RTPL's marginal graph for the year, drawn from the Plan column or the
+latest YTD column (the **Graph options** panel, Ctrl+2, chooses which and
+holds RTPL's other graph options), to see the room to the next bracket or
+cliff. Whole-dollar amounts round 50 cents up, as the
 IRS does; the calculations keep the cents. See "Estimated Quarterly Tax Assistant" in
 [docs/design.md](docs/design.md).
 

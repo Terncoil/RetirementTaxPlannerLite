@@ -436,3 +436,57 @@ def test_notes_toolbar_and_typing_shortcuts(win):
     QTest.keyClicks(t, "Item #1 ok")
     assert ed.markdown() == "Item #1 ok"
     ed.deleteLater()
+
+
+def test_latest_ytd_column():
+    from rtpl.app.eqta_window import latest_ytd_column
+    from rtpl.engine.estimated import PERIOD_ENDS
+
+    class WS:
+        period_ends = tuple(dt.date(2026, m, d) for m, d in PERIOD_ENDS)
+
+    assert latest_ytd_column(WS, dt.date(2026, 3, 30)) == 0  # nothing has ended yet
+    assert latest_ytd_column(WS, dt.date(2026, 3, 31)) == 0
+    assert latest_ytd_column(WS, dt.date(2026, 6, 1)) == 1
+    assert latest_ytd_column(WS, dt.date(2026, 11, 27)) == 2
+    assert latest_ytd_column(WS, dt.date(2027, 1, 5)) == 3
+
+
+def test_marginal_chart_draws_from_the_plan_or_the_latest_ytd_column(win, monkeypatch):
+    from rtpl.app import eqta_window as ew
+    from rtpl.engine.estimated import PLAN
+
+    monkeypatch.setattr(ew, "latest_ytd_column", lambda ws, today=None: 1)
+    win.load(sample(), None)
+    page = win.years.currentWidget()
+    assert [page.tabText(i) for i in range(page.count())] == [
+        "&Worksheet", "Calculation &detail", "Marginal &chart", "Marginal data &table"]
+    assert page.series is None  # drawn only when shown
+    page.setCurrentIndex(2)
+    assert page.series_column == PLAN and not page.graph_dirty
+    assert "Graph from the Plan column" in win.statusBar().currentMessage()
+    win.draw_from.setCurrentIndex(1)
+    win._graph_timer.stop()
+    win.update_graph()
+    assert page.series_column == 1
+    assert win.draw_from.itemText(1) == "Latest YTD column (YTD May 31)"
+    assert page.series.baseline.agi == pytest.approx(win.worksheet.federal[1].agi)
+    page.setCurrentIndex(3)
+    assert page.chart.table.rowCount() > 0
+    assert any("(VA)" in page.chart.table.item(r, 2).text() for r in range(page.chart.table.rowCount()))
+    # A layer turned off stays off for the window, and the table follows.
+    win.graph_options.checks["state"].click()
+    assert win.graph_options.overrides == {"state": False}
+    assert not any("(VA)" in page.chart.table.item(r, 2).text() for r in range(page.chart.table.rowCount()))
+    # An edit redraws the chart while it shows.
+    win.editor.changed.emit()
+    win._timer.stop()
+    win.recompute()
+    assert not page.graph_dirty and page.series_column == 1
+
+
+def test_graph_options_panel_toggles(win):
+    assert win.options_action.shortcut().toString() == "Ctrl+2"
+    was = win.panels.is_open(win.options_panel)
+    win.options_action.trigger()
+    assert win.panels.is_open(win.options_panel) != was

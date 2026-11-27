@@ -1,4 +1,5 @@
-"""The EQTA year tab: the read-only Worksheet and the Calculation detail.
+"""The EQTA year tab: the read-only Worksheet, the Calculation detail, and
+the marginal chart and its data table.
 
 ``worksheet_lines`` turns an engine ``Worksheet`` into rows of text, so the
 layout can be tested without Qt and reused by a later export.
@@ -27,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from rtpl.app import TIP_WIDTH
+from rtpl.app.marginal_view import MarginalChart
 from rtpl.engine.estimated import COLUMN_COUNT, PERIODS, Worksheet, detail_rows, worksheet_groups
 from rtpl.model.eqta import payment_label
 
@@ -233,6 +235,15 @@ class YearPage(QTabWidget):
         self.addTab(sheet, "&Worksheet")
         self.addTab(self.detail, "Calculation &detail")
         self.worksheet_widget = sheet
+        self.chart = MarginalChart()
+        self.addTab(self.chart.canvas, "Marginal &chart")
+        self.addTab(self.chart.table, "Marginal data &table")
+        self.graph_dirty = True  # the chart needs drawing when next shown
+        self.series = None  # the marginal series last drawn
+        self.series_column: int | None = None
+
+    def showing_graph(self) -> bool:
+        return self.currentWidget() in (self.chart.canvas, self.chart.table)
 
     def show_worksheet(self, ws: Worksheet) -> None:
         lines, notes = worksheet_lines(ws)
@@ -244,6 +255,8 @@ class YearPage(QTabWidget):
         self.worksheet.show_lines(list(COLUMN_TITLES), [Line(text, [""] * COLUMN_COUNT, "info")])
         self.notes.setText("")
         self.detail.setRowCount(0)
+        self.chart.clear(text)
+        self.graph_dirty = False
 
 
 def detail_lines(ws: Worksheet) -> list[Line]:
