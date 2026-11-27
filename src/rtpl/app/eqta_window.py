@@ -58,6 +58,13 @@ QUALIFIED_SHARE_NOTE = (
 )
 
 
+def default_year(eq: EqtaFile, today: dt.date | None = None) -> TaxYear | None:
+    """The tab a file opens at: this calendar year's (the first, if there
+    are two), or else the newest. The tabs run newest first."""
+    today = today or dt.date.today()
+    return eq.year(today.year) or (eq.years[0] if eq.years else None)
+
+
 class YearDialog(QDialog):
     """Tax year and description, for New, Clone and Rename/Describe Year."""
 
@@ -342,7 +349,7 @@ class EqtaWindow(QMainWindow):
         if answer:
             ty.year, ty.description = answer
             ty.profile.year = ty.year
-            self.eq.years.sort(key=lambda y: y.year)
+            self.eq.years.sort(key=lambda y: y.year, reverse=True)
             self._rebuild_tabs(ty)
             self._mark_modified()
 
@@ -405,7 +412,7 @@ class EqtaWindow(QMainWindow):
 
     def load(self, eq: EqtaFile, path: Path | None) -> None:
         self.eq, self.path = eq, path
-        self._rebuild_tabs(eq.years[-1] if eq.years else None)
+        self._rebuild_tabs(default_year(eq))
         self.setWindowModified(False)
         self._update_title()
 

@@ -347,7 +347,7 @@ class NewYearDefaults:
 
 @dataclass
 class EqtaFile:
-    years: list[TaxYear] = field(default_factory=list)
+    years: list[TaxYear] = field(default_factory=list)  # newest year first
     defaults: NewYearDefaults = field(default_factory=NewYearDefaults)
     schema_version: int = SCHEMA_VERSION
 
@@ -364,7 +364,7 @@ class EqtaFile:
         ty = TaxYear(year=year, description=description, profile=profile,
                      dependents=list(like.dependents) if like else [])
         self.years.append(ty)
-        self.years.sort(key=lambda y: y.year)
+        self.years.sort(key=lambda y: y.year, reverse=True)  # newest first
         return ty
 
     def clone_year(self, source: TaxYear, year: int, description: str = "") -> TaxYear:
@@ -397,7 +397,7 @@ class EqtaFile:
         if not isinstance(data, dict) or data.get("kind") != FILE_KIND:
             raise ValueError("Not an estimated tax (.eqta) file")
         years = [TaxYear.from_dict(y) for y in data.get("years", [])]
-        years.sort(key=lambda y: y.year)
+        years.sort(key=lambda y: y.year, reverse=True)  # newest first, as the tabs show
         return cls(years=years, defaults=NewYearDefaults.from_dict(data.get("defaults", {})),
                    schema_version=int(data.get("schema_version", SCHEMA_VERSION)))
 

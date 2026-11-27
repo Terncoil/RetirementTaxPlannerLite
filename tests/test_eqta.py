@@ -244,7 +244,7 @@ def test_clone_year_zeroes_amounts_and_sets_the_qualified_share():
     assert eq.clone_year(ty, 2028).sources[0].qualified_share == 0.6
     assert eq.new_source("dividends_to_split").qualified_share == 0.8
     assert eq.new_source("wages").qualified_share is None
-    assert [y.year for y in eq.years] == [2026, 2027, 2028]
+    assert [y.year for y in eq.years] == [2028, 2027, 2026]  # newest first
 
 
 def test_file_round_trip(tmp_path):

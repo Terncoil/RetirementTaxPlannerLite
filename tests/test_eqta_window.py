@@ -112,14 +112,14 @@ def test_year_menu(win, monkeypatch):
     answers = iter([(2027, "Projection"), (2025, "Last year"), (2024, "Older")])
     monkeypatch.setattr(win, "_ask_year", lambda *a: next(answers))
     win.clone_year()
-    assert [win.years.tabText(i) for i in range(win.years.count())] == ["2026 · Actuals", "2027 · Projection"]
+    assert [win.years.tabText(i) for i in range(win.years.count())] == ["2027 · Projection", "2026 · Actuals"]
     clone = win.current_year()
     assert clone.year == 2027 and [s.name for s in clone.sources][:2] == ["Alex SS", "Sam wages"]
     assert all(not s.entries and not s.plan_text for s in clone.sources)
     win.new_year()
     assert win.current_year().title == "2025 · Last year" and win.current_year().sources == []
     win.rename_year()
-    assert [win.years.tabText(i) for i in range(win.years.count())][0] == "2024 · Older"
+    assert [win.years.tabText(i) for i in range(win.years.count())][-1] == "2024 · Older"
     win.delete_year(confirm=False)
     assert win.years.count() == 2
 
@@ -334,3 +334,15 @@ def test_paid_totals_head_their_payment_lines(win):
     assert grid.item(r, 0).font().bold()
     guidance = labels[labels.index("Guidance (for information)") + 1:]
     assert guidance and all(label.startswith("  ") for label in guidance)
+
+
+def test_file_opens_at_this_years_tab():
+    from rtpl.app.eqta_window import default_year
+
+    eq = EqtaFile()
+    for year in (2025, 2027, 2026):
+        eq.new_year(year)
+    assert [y.year for y in eq.years] == [2027, 2026, 2025]  # tabs newest first
+    assert default_year(eq, dt.date(2026, 11, 26)).year == 2026
+    assert default_year(eq, dt.date(2030, 1, 5)).year == 2027  # no tab for this year: the newest
+    assert default_year(EqtaFile()) is None
