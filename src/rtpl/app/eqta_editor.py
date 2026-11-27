@@ -525,15 +525,16 @@ class NotesEdit(QWidget):
         button.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # keep the selection in the text
         return button
 
-    def _set_bold(self, on: bool) -> None:
-        fmt = QTextCharFormat()
-        fmt.setFontWeight(QFont.Weight.Bold if on else QFont.Weight.Normal)
-        self.text.mergeCurrentCharFormat(fmt)
+    def _set_bold(self, _checked: bool = False) -> None:
+        # Toggle from the text's own format, not the button's state, so a
+        # stale check mark can never turn bold off when it should go on.
+        on = self.text.fontWeight() < QFont.Weight.Bold
+        self.text.setFontWeight(QFont.Weight.Bold if on else QFont.Weight.Normal)
+        self._format_changed(self.text.currentCharFormat())
 
-    def _set_italic(self, on: bool) -> None:
-        fmt = QTextCharFormat()
-        fmt.setFontItalic(on)
-        self.text.mergeCurrentCharFormat(fmt)
+    def _set_italic(self, _checked: bool = False) -> None:
+        self.text.setFontItalic(not self.text.fontItalic())
+        self._format_changed(self.text.currentCharFormat())
 
     def _format_changed(self, fmt: QTextCharFormat) -> None:
         self.bold.defaultAction().setChecked(fmt.fontWeight() >= QFont.Weight.Bold)

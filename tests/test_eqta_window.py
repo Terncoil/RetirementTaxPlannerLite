@@ -361,6 +361,8 @@ def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
     cur.movePosition(QTextCursor.MoveOperation.EndOfWord, QTextCursor.MoveMode.KeepAnchor)
     page.text.setTextCursor(cur)
     page.edit.bold.defaultAction().trigger()
+    assert page.text.textCursor().charFormat().fontWeight() >= 700
+    assert page.edit.bold.defaultAction().isChecked()
     assert win.eq.notes == "**Keep** the HSA receipts"
     ed.tree.setCurrentItem(ed._find(("notes", None)))
     ed.notes_page.edit.set_markdown("")
