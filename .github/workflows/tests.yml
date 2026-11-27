@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       macos:
-        description: "Also test on macOS (uses 10x the Actions minutes)"
+        description: "Also test on macOS"
         type: boolean
         default: false
 

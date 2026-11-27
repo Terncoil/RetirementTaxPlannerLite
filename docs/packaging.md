@@ -115,22 +115,24 @@ people can try it with File > Open. It runs:
 * On pull requests that change packaging, app code or the examples, and by hand
   (Actions tab, "build apps", "Run workflow"): builds only, no release.
 
-### macOS builds are off for now
+### macOS builds
 
-While the repository is private, GitHub counts each macOS minute as ten
-against the monthly Actions allowance, so the Mac build and the Mac tests
-are switched off. Releases then carry the Windows and Linux downloads only.
+The repository is public, so GitHub's standard runners, macOS included,
+don't use the Actions allowance. Set the repository variable
+`MACOS_BUILDS` to `true` and leave it, and every build and release
+carries a Mac download next to the Windows and Linux ones.
 
-* **One Mac build:** Actions tab, *build apps*, *Run workflow*, tick
-  "Also build for macOS", *Run workflow*. The zip is on that run's page.
-* **Mac builds every time again:** Settings, *Secrets and variables*,
+* **Mac builds every time:** Settings, *Secrets and variables*,
   *Actions*, *Variables* tab, *New repository variable*: name
-  `MACOS_BUILDS`, value `true`. Delete it or set it to `false` to switch
-  them off again. It turns on both the Mac build and the Mac tests.
+  `MACOS_BUILDS`, value `true`. It turns on both the Mac build and the
+  Mac tests. Delete it or set it to `false` to switch them off.
+* **One Mac build while it is off:** Actions tab, *build apps*, *Run
+  workflow*, tick "Also build for macOS", *Run workflow*. The zip is on
+  that run's page.
 
-Public repositories get standard runners, macOS included, without using
-the allowance, so once the repository is public you can set
-`MACOS_BUILDS` to `true` and leave it.
+Without the variable, releases carry the Windows and Linux downloads
+only. (The switch dates from when the repository was private and each
+macOS minute counted as ten against the monthly allowance.)
 
 Other savings: draft pull requests skip the app builds (they run once
 the pull request is marked ready), and a new push to a pull request
