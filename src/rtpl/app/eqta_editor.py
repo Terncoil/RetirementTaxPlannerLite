@@ -1,6 +1,6 @@
 """The EQTA window's left panel: a tree of the year's items and an editor.
 
-The tree has fixed Profile, File notes, Year notes and Payments nodes, then the income
+The tree has fixed Profile, Notes (File and Year tabs) and Payments nodes, then the income
 sources grouped by tax type. Below it is the form for the selected item
 and, for income sources and payment lines, its register of date and
 amount rows. Every change is written straight into the year and announced
@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextEdit,
     QToolButton,
     QTreeWidget,
@@ -611,7 +612,7 @@ class NotesPage(QWidget):
         self.scope = scope  # "file" or "year"
         self.target: EqtaFile | TaxYear | None = None
         if scope == "file":
-            name, heading = "File notes", "Notes for the whole file, shown on every year's tab"
+            name, heading = "File notes", "Notes for the whole file, the same under every year"
             hint = "Notes for every year, such as account numbers or a long-term plan."
         else:
             name, heading = "Year notes", "Notes for this year"
@@ -635,6 +636,28 @@ class NotesPage(QWidget):
         if self.target is not None:
             self.target.notes = self.edit.markdown()
             self.changed.emit()
+
+
+class NotesTabs(QTabWidget):
+    """The Notes node: a File tab (the whole file) and a Year tab (this year's tab)."""
+
+    changed = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.file_page = NotesPage("file")
+        self.year_page = NotesPage("year")
+        self.addTab(self.file_page, "File")  # no & : Alt+F and Alt+Y open the menus
+        self.addTab(self.year_page, "Year")
+        self.setTabToolTip(0, "Notes for the whole file, the same under every year")
+        self.setTabToolTip(1, "Notes for this year's tab only")
+        self.file_page.changed.connect(self.changed)
+        self.year_page.changed.connect(self.changed)
+
+    def set_targets(self, eq: EqtaFile | None, ty: TaxYear) -> None:
+        self.file_page.set_target(eq if eq is not None else EqtaFile())
+        self.year_page.set_target(ty)
+        self.setTabText(1, f"Year ({ty.year})")
 
 
 class ItemPage(QWidget):
@@ -822,13 +845,12 @@ class EqtaEditor(QWidget):
         buttons.addWidget(self.delete_btn)
         buttons.addStretch(1)
         self.profile_page = ProfilePage(states)
-        self.file_notes_page = NotesPage("file")
-        self.notes_page = NotesPage("year")
+        self.notes_page = NotesTabs()
         self.item_page = ItemPage()
         self.blank = QLabel("Choose an item above to edit it.")
         self.blank.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.stack = QStackedWidget()
-        for w in (self.blank, self.profile_page, self.file_notes_page, self.notes_page, self.item_page):
+        for w in (self.blank, self.profile_page, self.notes_page, self.item_page):
             self.stack.addWidget(w)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
@@ -837,7 +859,6 @@ class EqtaEditor(QWidget):
         lay.addWidget(self.stack, 1)
         self.profile_page.changed.connect(self._profile_changed)
         self.notes_page.changed.connect(self.changed)
-        self.file_notes_page.changed.connect(self.changed)
         self.item_page.changed.connect(self.changed)
         self.item_page.renamed.connect(self._refresh_labels)
 
@@ -859,7 +880,7 @@ class EqtaEditor(QWidget):
             self._show_page(self.blank)
             return
         fixed = []
-        for text, kind in (("Profile", "profile"), ("File notes", "file_notes"), ("Year notes", "notes")):
+        for text, kind in (("Profile", "profile"), ("Notes", "notes")):
             node = QTreeWidgetItem([text])
             node.setData(0, ROLE, (kind, None))
             fixed.append(node)
@@ -911,11 +932,8 @@ class EqtaEditor(QWidget):
             self.profile_page.set_year(ty)
             self._show_page(self.profile_page)
         elif kind == "notes":
-            self.notes_page.set_target(ty)
+            self.notes_page.set_targets(self.eq, ty)
             self._show_page(self.notes_page)
-        elif kind == "file_notes" and self.eq is not None:
-            self.file_notes_page.set_target(self.eq)
-            self._show_page(self.file_notes_page)
         elif kind == "payment":
             self.item_page.set_item(ty, ty.payments[key], self._state_label())
             self._show_page(self.item_page)

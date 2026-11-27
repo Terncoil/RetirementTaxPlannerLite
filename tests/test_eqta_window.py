@@ -63,7 +63,7 @@ def test_new_file_has_this_years_tab(win):
     assert win.windowTitle().startswith("Untitled[*]")
     tree = win.editor.tree
     assert [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())] == [
-        "Profile", "File notes", "Year notes", "Payments", "Income and deductions"]
+        "Profile", "Notes", "Payments", "Income and deductions"]
 
 
 def test_worksheet_rows(win):
@@ -352,9 +352,11 @@ def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
     from PySide6.QtGui import QTextCursor
 
     ed = win.editor
-    ed.tree.setCurrentItem(ed._find(("file_notes", None)))
-    page = ed.file_notes_page
-    assert ed.stack.currentWidget() is page
+    ed.tree.setCurrentItem(ed._find(("notes", None)))
+    tabs = ed.notes_page
+    assert ed.stack.currentWidget() is tabs
+    assert [tabs.tabText(i) for i in range(2)] == ["File", f"Year ({win.current_year().year})"]
+    page = tabs.file_page
     page.text.setPlainText("Keep the HSA receipts")
     cur = page.text.textCursor()
     cur.movePosition(QTextCursor.MoveOperation.Start)
@@ -364,22 +366,21 @@ def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
     assert page.text.textCursor().charFormat().fontWeight() >= 700
     assert page.edit.bold.defaultAction().isChecked()
     assert win.eq.notes == "**Keep** the HSA receipts"
-    ed.tree.setCurrentItem(ed._find(("notes", None)))
-    ed.notes_page.edit.set_markdown("")
-    ed.notes_page.text.setPlainText("Convert in *December*")
+    year_page = tabs.year_page
+    year_page.text.setPlainText("Convert in *December*")
     ty = win.current_year()
     saved = ty.notes
     assert saved.startswith("Convert in \\*")  # typed asterisks stay literal
     assert win.isWindowModified()
-    ed.notes_page.set_target(ty)  # opening the page changes nothing
-    assert ty.notes == saved and ed.notes_page.text.toPlainText() == "Convert in *December*"
+    year_page.set_target(ty)  # opening the page changes nothing
+    assert ty.notes == saved and year_page.text.toPlainText() == "Convert in *December*"
     path = tmp_path / "n.eqta"
     win.eq.save(path)
     back = EqtaFile.load(path)
     assert back.notes == "**Keep** the HSA receipts"
     # The file notes show the same text under another year's tree.
     ed.tree.setCurrentItem(ed._find(("profile", None)))
-    ed.tree.setCurrentItem(ed._find(("file_notes", None)))
+    ed.tree.setCurrentItem(ed._find(("notes", None)))
     assert page.text.toPlainText() == "Keep the HSA receipts"
 
 
