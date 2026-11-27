@@ -21,28 +21,51 @@ EQTA_SHORTCUT = "Ctrl+Alt+2"
 
 
 class AppWindows:
-    def __init__(self, library=None, theme_mode: str = "system") -> None:
+    def __init__(self, library=None, theme_mode: str | None = None) -> None:
         self.library = library
-        self.theme_mode = theme_mode
+        self.theme_mode = theme_mode  # None: the one saved from the View menu
+        self.effective_mode: str | None = None  # light or dark, once applied
         self._rtpl = None
         self._eqta = None
+
+    # -- the theme ----------------------------------------------------------
+    def _ensure_theme(self) -> str:
+        """Apply the saved theme before the first window shows, whichever
+        window that is (a double-clicked .eqta file opens only EQTA's)."""
+        if self.effective_mode is None:
+            from rtpl.app.main_window import apply_app_theme, saved_theme_mode
+
+            if self.theme_mode is None:
+                self.theme_mode = saved_theme_mode()
+            app = QApplication.instance()
+            self.effective_mode = apply_app_theme(app, self.theme_mode) if app is not None else "light"
+        return self.effective_mode
+
+    def set_theme(self, mode: str) -> None:
+        """A theme chosen in either window's View menu: saved, and shown in both."""
+        from rtpl.app.main_window import apply_app_theme, save_theme_mode
+
+        save_theme_mode(mode)
+        self.theme_mode = mode
+        self.effective_mode = apply_app_theme(QApplication.instance(), mode)
+        for win in (self._rtpl, self._eqta):
+            if win is not None:
+                win.theme_changed(mode, self.effective_mode)
 
     # -- the windows --------------------------------------------------------
     def rtpl_window(self, create: bool = True):
         if self._rtpl is None and create:
-            from rtpl.app.main_window import MainWindow, apply_app_theme
+            from rtpl.app.main_window import MainWindow
 
+            effective = self._ensure_theme()
             if self.library is None:
                 win = MainWindow()
                 self.library = win.library
             else:
                 win = MainWindow(self.library)
-            app = QApplication.instance()
-            if app is not None:
-                win.effective_mode = apply_app_theme(app, self.theme_mode)
-            win.redraw()
-            win.resize_to_screen()
             win.windows = self
+            win.theme_changed(self.theme_mode, effective)
+            win.resize_to_screen()
             self.add_window_menu(win)
             self._rtpl = win
         return self._rtpl
@@ -51,11 +74,13 @@ class AppWindows:
         if self._eqta is None and create:
             from rtpl.app.eqta_window import EqtaWindow
 
+            effective = self._ensure_theme()
             win = EqtaWindow(self.library)
             if self.library is None:
                 self.library = win.library
             win.resize_to_screen()
             win.windows = self
+            win.theme_changed(self.theme_mode, effective)
             self.add_window_menu(win)
             self._eqta = win
         return self._eqta

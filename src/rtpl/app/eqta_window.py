@@ -13,7 +13,7 @@ import textwrap
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QSettings, Qt, QTimer
-from PySide6.QtGui import QAction, QGuiApplication, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QGuiApplication, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -214,11 +214,37 @@ class EqtaWindow(QMainWindow):
                                               "amount zeroed: no register entries and no plan amounts.")
         y.setToolTipsVisible(True)
         v = self.menuBar().addMenu("&View")
+        from rtpl.app.main_window import THEME_MODES, saved_theme_mode
+
+        group = QActionGroup(self)
+        self.theme_actions = {}
+        current = saved_theme_mode()
+        for text, mode in THEME_MODES:
+            act = QAction(text, self, checkable=True, checked=mode == current)
+            act.triggered.connect(lambda _=False, md=mode: self.set_theme_mode(md))
+            group.addAction(act)
+            v.addAction(act)
+            self.theme_actions[mode] = act
+        v.addSeparator()
         v.addAction(self.inputs_action)
         v.addAction(QAction("&Reset Window Layout", self, triggered=self.reset_layout))
         v.addSeparator()
         v.addAction(QAction("New Year &Defaults…", self, triggered=self.edit_defaults))
         self.view_menu = v
+
+    def set_theme_mode(self, mode: str) -> None:
+        """View > System theme, Light mode or Dark mode, shared with RTPL."""
+        if self.windows is not None:
+            self.windows.set_theme(mode)
+            return
+        from rtpl.app.main_window import apply_app_theme, save_theme_mode
+
+        save_theme_mode(mode)
+        self.theme_changed(mode, apply_app_theme(QApplication.instance(), mode))
+
+    def theme_changed(self, mode: str, effective: str) -> None:
+        self.theme_actions[mode].setChecked(True)
+        self.recompute()  # the worksheet's dimmed lines take the new colors
 
     def resize_to_screen(self) -> None:
         geometry = self.settings.value("window/geometry")

@@ -288,3 +288,37 @@ def test_panel_fits_each_form(win):
         assert win.inputs_panel.scroll.horizontalScrollBar().value() == 0
         widths.append(win.inputs_panel.minimumWidth())
     assert max(widths) <= 420  # the long tax type names don't widen it
+
+
+def test_saved_theme_applies_when_only_the_eqta_window_opens(tmp_path, monkeypatch, lib):
+    """A double-clicked .eqta file opens only the EQTA window; it still
+    gets the theme chosen in the View menu last time."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    from PySide6.QtGui import QPalette
+
+    from rtpl.app.main_window import apply_app_theme, save_theme_mode, saved_theme_mode
+    from rtpl.app.windows import AppWindows
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    save_theme_mode("dark")
+    windows = AppWindows(lib)
+    eqta = windows.eqta_window()
+    rtpl = None
+    try:
+        assert windows.effective_mode == "dark"
+        assert app.palette().color(QPalette.ColorRole.Window).lightness() < 80
+        assert eqta.theme_actions["dark"].isChecked()
+        rtpl = windows.rtpl_window()
+        assert rtpl.theme_actions["dark"].isChecked() and rtpl.effective_mode == "dark"
+        eqta.theme_actions["light"].trigger()  # either window's View menu sets both
+        assert saved_theme_mode() == "light"
+        assert rtpl.theme_actions["light"].isChecked() and rtpl.effective_mode == "light"
+        assert app.palette().color(QPalette.ColorRole.Window).lightness() > 200
+    finally:
+        apply_app_theme(app, "light")
+        for w in (eqta, rtpl):
+            if w is not None:
+                w.setWindowModified(False)
+                w.close()
+                w.deleteLater()
+        app.sendPostedEvents(None, QtCore.QEvent.Type.DeferredDelete)

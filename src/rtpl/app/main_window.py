@@ -122,6 +122,23 @@ class AppStyle(QProxyStyle):
 
 
 _theme_mode = {"effective": "light"}  # the mode apply_app_theme last set
+THEME_MODES = (("&System theme", "system"), ("&Light mode", "light"), ("&Dark mode", "dark"))
+
+
+def _view_settings() -> QSettings:
+    return QSettings(str(config_dir() / "window.ini"), QSettings.Format.IniFormat)
+
+
+def saved_theme_mode() -> str:
+    """The View menu's theme (system, light or dark), the same for both windows."""
+    mode = _view_settings().value("view/theme", "system")
+    return mode if mode in ("system", "light", "dark") else "system"
+
+
+def save_theme_mode(mode: str) -> None:
+    settings = _view_settings()
+    settings.setValue("view/theme", mode)
+    settings.sync()
 
 
 def sync_title_bar(window: QWidget) -> None:
@@ -383,7 +400,7 @@ class MainWindow(QMainWindow):
         self.theme_path = config_dir() / "theme.toml"
         self.theme = Theme.load(self.theme_path)
         self.new_defaults_path = config_dir() / "new_profile.json"
-        self.theme_mode = "system"
+        self.theme_mode = saved_theme_mode()
         self.effective_mode = "light"
         self.current_path: Path | None = None
         self.windows = None  # the app's window manager (rtpl.app.windows), when there is one
@@ -748,11 +765,13 @@ class MainWindow(QMainWindow):
         v = self.menuBar().addMenu("&View")
         v.setToolTipsVisible(True)
         group = QActionGroup(self)
-        for text, mode in (("&System theme", "system"), ("&Light mode", "light"), ("&Dark mode", "dark")):
-            act = QAction(text, self, checkable=True, checked=mode == "system")
+        self.theme_actions = {}
+        for text, mode in THEME_MODES:
+            act = QAction(text, self, checkable=True, checked=mode == self.theme_mode)
             act.triggered.connect(lambda _=False, md=mode: self.set_theme_mode(md))
             group.addAction(act)
             v.addAction(act)
+            self.theme_actions[mode] = act
         v.addSeparator()
         v.addAction(self.inputs_action)
         v.addAction(self.options_action)
@@ -895,8 +914,17 @@ class MainWindow(QMainWindow):
                 self.table.setItem(r, c, item)
 
     def set_theme_mode(self, mode: str) -> None:
-        self.theme_mode = mode
-        self.effective_mode = apply_app_theme(QApplication.instance(), mode)
+        """View > System theme, Light mode or Dark mode: remembered, and the
+        same in both windows."""
+        if self.windows is not None:
+            self.windows.set_theme(mode)
+            return
+        save_theme_mode(mode)
+        self.theme_changed(mode, apply_app_theme(QApplication.instance(), mode))
+
+    def theme_changed(self, mode: str, effective: str) -> None:
+        self.theme_mode, self.effective_mode = mode, effective
+        self.theme_actions[mode].setChecked(True)
         self.redraw()
 
     def edit_colors(self) -> None:
