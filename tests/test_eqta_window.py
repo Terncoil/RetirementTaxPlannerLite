@@ -436,3 +436,47 @@ def test_notes_toolbar_and_typing_shortcuts(win):
     QTest.keyClicks(t, "Item #1 ok")
     assert ed.markdown() == "Item #1 ok"
     ed.deleteLater()
+
+
+def test_marginal_chart_draws_from_the_chosen_column_dec_31_by_default(win):
+    from rtpl.engine.estimated import PLAN
+
+    win.load(sample(), None)
+    page = win.years.currentWidget()
+    assert [page.tabText(i) for i in range(page.count())] == [
+        "&Worksheet", "Calculation &detail", "Marginal &chart", "Marginal data &table"]
+    assert [win.draw_from.itemText(i) for i in range(5)] == [
+        "YTD Mar 31", "YTD May 31", "YTD Aug 31", "YTD Dec 31", "Plan"]
+    assert page.series is None  # drawn only when shown
+    page.setCurrentIndex(2)
+    assert page.series_column == 3 and not page.graph_dirty
+    assert "Graph from YTD Dec 31" in win.statusBar().currentMessage()
+    assert page.series.baseline.agi == pytest.approx(win.worksheet.federal[3].agi)
+    win.draw_from.setCurrentIndex(PLAN)
+    win._graph_timer.stop()
+    win.update_graph()
+    assert page.series_column == PLAN
+    assert "Graph from the Plan column" in win.statusBar().currentMessage()
+    win.draw_from.setCurrentIndex(1)
+    win._graph_timer.stop()
+    win.update_graph()
+    assert page.series.baseline.agi == pytest.approx(win.worksheet.federal[1].agi)
+    page.setCurrentIndex(3)
+    assert page.chart.table.rowCount() > 0
+    assert any("(VA)" in page.chart.table.item(r, 2).text() for r in range(page.chart.table.rowCount()))
+    # A layer turned off stays off for the window, and the table follows.
+    win.graph_options.checks["state"].click()
+    assert win.graph_options.overrides == {"state": False}
+    assert not any("(VA)" in page.chart.table.item(r, 2).text() for r in range(page.chart.table.rowCount()))
+    # An edit redraws the chart while it shows.
+    win.editor.changed.emit()
+    win._timer.stop()
+    win.recompute()
+    assert not page.graph_dirty and page.series_column == 1
+
+
+def test_graph_options_panel_toggles(win):
+    assert win.options_action.shortcut().toString() == "Ctrl+2"
+    was = win.panels.is_open(win.options_panel)
+    win.options_action.trigger()
+    assert win.panels.is_open(win.options_panel) != was

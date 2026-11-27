@@ -410,10 +410,20 @@ Guidance, dimmed and for information only:
 * State: the annualized amount with the state's own percentages
   (California 27/63/63/90). State safe-harbor rules are not modeled yet.
 
-**Later** (GitHub issue #45): the Marginal chart and Marginal data table
-tabs with the graph options panel, handing a second double-click to the
-running copy, importing the old spreadsheet, CSV import, capital loss
-carryover, state safe harbors.
+**Marginal chart and data table**: RTPL's marginal graph for the year,
+drawn from any of the five worksheet columns (Graph options > Draw from),
+YTD Dec 31 by default: every register entry for the year, those dated
+ahead included, so the data table shows the room left to each bracket
+edge and cliff by year end. The profile is the worksheet's, with each
+source's amount from that column. The pieces are shared with the
+RTPL window (`app/marginal_view.py`): `MarginalOptions` is the Graph
+options panel (plus EQTA's Draw from choice), `MarginalChart` the chart
+and its table. A year's chart is computed only while its tab shows, and
+the layer choices apply to every year in the window.
+
+**Later** (GitHub issue #45): importing the old spreadsheet, CSV import,
+capital loss carryover, state safe harbors. Handing a second double-click
+to the running copy is #63.
 
 ## Accessibility and CUA
 

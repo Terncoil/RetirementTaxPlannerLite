@@ -1,8 +1,10 @@
 """The Estimated Quarterly Tax Assistant (EQTA) window.
 
-One tab per tax year in the open ``.eqta`` file, each with a Worksheet and
-a Calculation detail tab. The Inputs panel on the left edits the current
-year. The window has its own File, Year and View menus; the Window menu
+One tab per tax year in the open ``.eqta`` file, each with a Worksheet, a
+Calculation detail, and a Marginal chart and data table. The Inputs panel
+on the left edits the current year; the Graph options panel on the right
+holds RTPL's marginal graph options, plus which worksheet column the graph
+draws from (YTD Dec 31 unless chosen otherwise). The window has its own File, Year and View menus; the Window menu
 (added by ``rtpl.app.windows``) switches to the RTPL window.
 """
 
@@ -38,12 +40,14 @@ from PySide6.QtWidgets import (
 from rtpl.app import TIP_WIDTH
 from rtpl.app.documents import EQTA_FILTER, EQTA_SUFFIX, WINDOW_EQTA, window_for, with_eqta_suffix
 from rtpl.app.eqta_editor import EqtaEditor
-from rtpl.app.eqta_worksheet import YearPage, money
-from rtpl.app.inputs import SpinBox
+from rtpl.app.eqta_worksheet import COLUMN_TITLES, YearPage, money
+from rtpl.app.inputs import ComboBox, SpinBox
+from rtpl.app.marginal_view import MarginalOptions, compute_series
 from rtpl.app.side_panel import PanelHost, SidePanel
-from rtpl.engine.estimated import compute_worksheet
+from rtpl.engine.estimated import PERIODS, PLAN, Worksheet, build_profile, compute_worksheet
 from rtpl.model.eqta import EqtaFile, NewYearDefaults, TaxYear
 from rtpl.taxlaw.loader import TaxLawLibrary
+from rtpl.theme import Theme
 
 EQTA_NAME = "Estimated Quarterly Tax Assistant"
 DEFAULT_PANEL_WIDTH = 400
@@ -145,6 +149,10 @@ class EqtaWindow(QMainWindow):
         self.eq = EqtaFile()
         self.settings = QSettings(str(settings_path or config_dir() / "eqta_window.ini"),
                                   QSettings.Format.IniFormat)
+        self.theme_path = config_dir() / "theme.toml"
+        self.theme = Theme.load(self.theme_path)  # the chart colors, shared with RTPL
+        self.effective_mode = "light"
+        self.worksheet: Worksheet | None = None
 
         self.years = QTabWidget()
         self.years.setDocumentMode(True)
@@ -152,6 +160,20 @@ class EqtaWindow(QMainWindow):
         self.years.currentChanged.connect(self._year_changed)
         self.editor = EqtaEditor(self.library.available_states(), state_name=self._state_name)
         self.inputs_panel = SidePanel("Inputs", self.editor, Qt.Edge.LeftEdge)
+        self.graph_options = MarginalOptions()
+        self.draw_from = ComboBox()
+        for i, title in enumerate(COLUMN_TITLES):
+            self.draw_from.addItem(title, i)
+        self.draw_from.setCurrentIndex(PERIODS - 1)  # YTD Dec 31: the whole year's registers
+        self.draw_from.setAccessibleName("Draw the graph from")
+        self.draw_from.setToolTip("The worksheet column whose income the graph starts from.\n"
+                                  "YTD Dec 31 counts every register entry for the year, dated\n"
+                                  "ahead included, so the data table shows the room left to\n"
+                                  "each bracket edge and cliff by year end.")
+        from_label = QLabel("Draw &from")
+        from_label.setBuddy(self.draw_from)
+        self.graph_options.form.insertRow(0, from_label, self.draw_from)
+        self.options_panel = SidePanel("Graph options", self.graph_options, Qt.Edge.RightEdge)
         workspace = QWidget()
         self.panels = PanelHost(workspace, self.years)
         self.setCentralWidget(workspace)
@@ -159,10 +181,20 @@ class EqtaWindow(QMainWindow):
         # Wide enough for the register's amounts and the forms' labels.
         self.inputs_panel.saved_width = int(self.settings.value("panels/inputs_width", 0) or 0) or DEFAULT_PANEL_WIDTH
         self.panels.add(self.inputs_panel, pinned, pinned)
+        wide = self._screen_width() >= 1300
+        opt_pinned = self.settings.value("panels/options_pinned", wide) in (True, "true")
+        opt_open = self.settings.value("panels/options_open", opt_pinned) in (True, "true")
+        self.options_panel.saved_width = int(self.settings.value("panels/options_width", 0) or 0)
+        self.panels.add(self.options_panel, opt_pinned, opt_open)
         self.panels.visibility_changed.connect(self._panel_state_changed)
         self.panels.pinned_changed.connect(self._panel_state_changed)
         self._timer = QTimer(self, singleShot=True, interval=200)
         self._timer.timeout.connect(self.recompute)
+        self._graph_timer = QTimer(self, singleShot=True, interval=200)
+        self._graph_timer.timeout.connect(self.update_graph)
+        self.graph_options.changed.connect(self._graph_timer.start)
+        self.graph_options.toggled.connect(self.redraw_graph)
+        self.draw_from.currentIndexChanged.connect(self._graph_timer.start)
         self.editor.changed.connect(self._edited)
         self.editor.page_changed.connect(self._refit_inputs)
         self._build_toolbar()
@@ -189,11 +221,23 @@ class EqtaWindow(QMainWindow):
         self.inputs_action.setToolTip("Show or hide the inputs panel (Ctrl+1)")
         self.inputs_action.triggered.connect(lambda: self.panels.toggle(self.inputs_panel))
         bar.addAction(self.inputs_action)
+        self.options_action = QAction("&Graph options", self, checkable=True, shortcut="Ctrl+2")
+        self.options_action.setToolTip("Show or hide the graph options panel (Ctrl+2)")
+        self.options_action.triggered.connect(lambda: self.panels.toggle(self.options_panel))
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         bar.addWidget(spacer)
+        bar.addAction(self.options_action)  # on the right, beside its panel, as in RTPL
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, bar)
+        self._sync_panel_actions()
+
+    def _sync_panel_actions(self) -> None:
         self.inputs_action.setChecked(self.panels.is_open(self.inputs_panel))
+        self.options_action.setChecked(self.panels.is_open(self.options_panel))
+
+    def _screen_width(self) -> int:
+        screen = QGuiApplication.primaryScreen()
+        return screen.availableGeometry().width() if screen is not None else 1300
 
     def _build_menus(self) -> None:
         m = self.menuBar().addMenu("&File")
@@ -234,6 +278,7 @@ class EqtaWindow(QMainWindow):
             self.theme_actions[mode] = act
         v.addSeparator()
         v.addAction(self.inputs_action)
+        v.addAction(self.options_action)
         v.addAction(QAction("&Reset Window Layout", self, triggered=self.reset_layout))
         v.addSeparator()
         v.addAction(QAction("New Year &Defaults…", self, triggered=self.edit_defaults))
@@ -251,7 +296,11 @@ class EqtaWindow(QMainWindow):
 
     def theme_changed(self, mode: str, effective: str) -> None:
         self.theme_actions[mode].setChecked(True)
-        self.recompute()  # the worksheet's dimmed lines take the new colors
+        self.effective_mode = effective
+        self.theme = Theme.load(self.theme_path)  # colors may have been edited in RTPL
+        for i in range(self.years.count()):
+            self.years.widget(i).graph_dirty = True
+        self.recompute()  # the worksheet's dimmed lines and the chart take the new colors
 
     def resize_to_screen(self) -> None:
         geometry = self.settings.value("window/geometry")
@@ -272,6 +321,10 @@ class EqtaWindow(QMainWindow):
         self.inputs_panel.saved_width = DEFAULT_PANEL_WIDTH
         self.panels.set_pinned(self.inputs_panel, True)
         self.panels.set_open(self.inputs_panel, True)
+        wide = self._screen_width() >= 1300
+        self.options_panel.saved_width = 0
+        self.panels.set_pinned(self.options_panel, wide)
+        self.panels.set_open(self.options_panel, wide)
         self.showNormal()
         self.resize_to_screen()
 
@@ -284,13 +337,20 @@ class EqtaWindow(QMainWindow):
         self.inputs_panel.scroll.horizontalScrollBar().setValue(0)
 
     def _panel_state_changed(self, *_args) -> None:
-        self.inputs_action.setChecked(self.panels.is_open(self.inputs_panel))
+        self._sync_panel_actions()
         self.settings.setValue("panels/inputs_pinned", self.panels.is_pinned(self.inputs_panel))
+        self.settings.setValue("panels/options_pinned", self.panels.is_pinned(self.options_panel))
+        self.settings.setValue("panels/options_open", self.panels.is_open(self.options_panel))
+        page = self.years.currentWidget()
+        if page is not None and page.showing_graph() and page.graph_dirty:
+            self.update_graph()
 
     def save_window_state(self) -> None:
         self.settings.setValue("window/geometry", self.saveGeometry())
         if self.inputs_panel.saved_width:
             self.settings.setValue("panels/inputs_width", self.inputs_panel.saved_width)
+        if self.options_panel.saved_width:
+            self.settings.setValue("panels/options_width", self.options_panel.saved_width)
         self.settings.sync()
 
     # -- years ------------------------------------------------------------
@@ -305,7 +365,9 @@ class EqtaWindow(QMainWindow):
             self.years.removeTab(0)
             w.deleteLater()
         for ty in self.eq.years:
-            self.years.addTab(YearPage(), ty.title)
+            page = YearPage()
+            page.currentChanged.connect(self._subtab_changed)
+            self.years.addTab(page, ty.title)
         if select is not None and select in self.eq.years:
             self.years.setCurrentIndex(self.eq.years.index(select))
         self.years.blockSignals(False)
@@ -396,11 +458,64 @@ class EqtaWindow(QMainWindow):
             return
         page.show_worksheet(ws)
         self.worksheet = ws
+        for i in range(self.draw_from.count()):  # the dates follow the year
+            self.draw_from.setItemText(i, page.worksheet.horizontalHeaderItem(i + 1).text())
+        page.graph_dirty = True
+        if page.showing_graph():
+            self._graph_timer.stop()
+            self.update_graph()
         self.statusBar().showMessage(
             f"{ty.title} through December 31: federal tax {money(ws.federal_tax[3])}, "
             f"owed {money(ws.federal_owed[3])}"
             + (f"; {ws.state.name} tax {money(ws.state_tax[3])}, owed {money(ws.state_owed[3])}"
                if ws.state else ""))
+
+    # -- the marginal graph -------------------------------------------------
+    def _subtab_changed(self, _index: int) -> None:
+        page = self.years.currentWidget()
+        if page is not None and page.showing_graph() and page.graph_dirty:
+            self.update_graph()
+
+    def graph_column(self) -> int:
+        """The worksheet column the graph draws from."""
+        return int(self.draw_from.currentData())
+
+    def update_graph(self) -> None:
+        """Build the marginal series for the current year's chosen column."""
+        ty, page, ws = self.current_year(), self.years.currentWidget(), self.worksheet
+        if ty is None or page is None or ws is None or ws.ty is not ty:
+            return
+        col = self.graph_column()
+        profile = build_profile(ty, ws.amounts[col])
+        try:
+            page.series = compute_series(profile, self.library, self.graph_options)
+        except (KeyError, ValueError) as exc:
+            page.chart.clear(f"Cannot compute: {exc}")
+            self.statusBar().showMessage(f"Cannot compute: {exc}")
+            return
+        page.series_column = col
+        self.graph_options.show_state(page.series)
+        self.redraw_graph()
+        b = page.series.baseline
+        what = "the Plan column" if col == PLAN else page.worksheet.horizontalHeaderItem(col + 1).text()
+        parts = [f"AGI {money(b.agi)}", f"taxable income {money(b.taxable_income)}",
+                 f"federal tax {money(b.federal_tax)}"]
+        if ws.state is not None:
+            parts.append(f"{ws.state.name} tax {money(b.state_tax)}")
+        hint = ""
+        if col == PLAN and not any(ws.amounts[PLAN]):
+            hint = " (no plan amounts yet)"
+        self.statusBar().showMessage(f"Graph from {what}{hint}: " + ", ".join(parts))
+
+    def redraw_graph(self) -> None:
+        page = self.years.currentWidget()
+        series = getattr(page, "series", None)
+        if series is None:
+            return
+        vis = self.graph_options.visibility(series)
+        self.graph_options.sync_checks(vis)
+        page.chart.show(series, vis, self.theme.palette(self.effective_mode))
+        page.graph_dirty = False
 
     # -- files ----------------------------------------------------------------
     def _mark_modified(self) -> None:

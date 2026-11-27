@@ -4,27 +4,19 @@ from __future__ import annotations
 
 import json
 import sys
-import textwrap
 from datetime import date
 from pathlib import Path
 
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-from matplotlib.figure import Figure
 from PySide6.QtCore import QEvent, QSettings, QSignalBlocker, QStandardPaths, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QActionGroup, QColor, QDesktopServices, QIcon, QPixmap, QGuiApplication, QKeySequence, QPalette
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QColorDialog,
-    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
     QGridLayout,
-    QGroupBox,
-    QHBoxLayout,
-    QHeaderView,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -34,8 +26,6 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QStyle,
     QStyleOptionMenuItem,
-    QTableWidget,
-    QTableWidgetItem,
     QStackedWidget,
     QTabWidget,
     QToolBar,
@@ -44,7 +34,6 @@ from PySide6.QtWidgets import (
 )
 
 from rtpl import __version__
-from rtpl.app import TIP_WIDTH
 from rtpl.export import write_csv, write_ods
 from rtpl.app.documents import (
     OPEN_FILTER,
@@ -62,21 +51,14 @@ from rtpl.app.shortcut import (
     register_file_types,
     unregister_file_types,
 )
-from rtpl.app.inputs import ComboBox
 from rtpl.app.plan_editor import PlanEditor
 from rtpl.app.plan_view import PlanView
-from rtpl.app.profile_form import ProfileForm, money_box
+from rtpl.app.profile_form import ProfileForm
+from rtpl.app.marginal_view import ANNOTATION_LABELS, MarginalChart, MarginalOptions, compute_series  # noqa: F401
 from rtpl.app.side_panel import PanelHost, PanelTabs, SidePanel
 from rtpl.charts.forward_chart import render_balances, render_income, render_taxes
 from rtpl.charts.marginal_chart import render_marginal
-from rtpl.engine.marginal import (
-    ANNOTATIONS,
-    LAYERS,
-    MarginalSeries,
-    build_marginal_series,
-    default_visibility,
-)
-from rtpl.engine.tax import IncomeSource
+from rtpl.engine.marginal import LAYERS, MarginalSeries
 from rtpl.model.plan import Plan
 from rtpl.model.profile import Person, Profile
 from rtpl.report import ReportChart, Section, profile_sections, write_report
@@ -84,11 +66,6 @@ from rtpl.taxlaw.loader import TaxLawLibrary
 from rtpl.theme import Theme
 
 APP_NAME = "RetirementTaxPlannerLite"
-ANNOTATION_LABELS = {
-    "irmaa": "IRMAA brackets (Medicare)",
-    "aca": "ACA subsidy cliffs",
-    "state_cliff": "State tax cliffs",
-}
 
 
 PROJECT_URL = "https://github.com/Terncoil/RetirementTaxPlannerLite"
@@ -405,21 +382,12 @@ class MainWindow(QMainWindow):
         self.current_path: Path | None = None
         self.windows = None  # the app's window manager (rtpl.app.windows), when there is one
         self.series: MarginalSeries | None = None
-        self.overrides: dict[str, bool] = {}  # user's explicit layer choices
 
-        # Center: chart and data table
+        # Center: chart and data table (shared with the EQTA window)
+        self.chart = MarginalChart()
+        self.figure, self.canvas, self.table = self.chart.figure, self.chart.canvas, self.chart.table
         self.tabs = QTabWidget()
-        self.figure = Figure(figsize=(9, 6), dpi=100)
-        self.canvas = FigureCanvasQTAgg(self.figure)
-        self.canvas.setMinimumSize(320, 240)
-        self.canvas.setAccessibleName("Marginal tax rate chart")
-        self.canvas.setAccessibleDescription("The Data table tab lists the same information as text.")
         self.tabs.addTab(self.canvas, "&Chart")
-        self.table = QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Additional income", "Marginal rate", "What changes"])
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table.setAccessibleName("Marginal rate data table")
         self.tabs.addTab(self.table, "&Data table")
 
         # Side panels: inputs on the left, graph options on the right. Each
@@ -526,89 +494,17 @@ class MainWindow(QMainWindow):
         )
 
     def _build_options(self) -> QWidget:
-        box = QWidget()
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(6, 6, 6, 6)
-        left = QFormLayout()
-        left.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
-        self.source = ComboBox()
-        for s in IncomeSource:
-            self.source.addItem(s.label[0].upper() + s.label[1:], s.value)
-        self.source.setAccessibleName("Source of additional income")
-        src_label = QLabel("&Additional income source")
-        src_label.setBuddy(self.source)
-        left.addRow(src_label, self.source)
-        self.x_max = money_box()
-        self.x_max.setRange(10_000, 5_000_000)
-        self.x_max.setSingleStep(25_000)
-        self.x_max.setValue(250_000)
-        self.x_max.setAccessibleName("Show additional income up to")
-        xlabel = QLabel("Show up &to")
-        xlabel.setBuddy(self.x_max)
-        left.addRow(xlabel, self.x_max)
-        self.irmaa_basis = ComboBox()
-        self.irmaa_basis.addItem("Premiums 2 years out (projected)", "premium_year")
-        self.irmaa_basis.addItem("This year's published brackets", "current_year")
-        self.irmaa_basis.setAccessibleName("IRMAA brackets to show")
-        self.irmaa_basis.setToolTip(
-            "Income this year sets Medicare premiums two years from now, so the\n"
-            "default shows those brackets, projected with the profile's\n"
-            "inflation rate."
-        )
-        ilabel = QLabel("&IRMAA brackets")
-        ilabel.setBuddy(self.irmaa_basis)
-        left.addRow(ilabel, self.irmaa_basis)
-        for combo in (self.source, self.irmaa_basis):
-            # Size to a short width and let the popup list show full items.
-            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-            combo.setMinimumContentsLength(20)
-        lay.addLayout(left)
+        self.graph_options = opts = MarginalOptions()
+        self.source, self.x_max, self.irmaa_basis = opts.source, opts.x_max, opts.irmaa_basis
+        self.checks = opts.checks
+        opts.changed.connect(self._schedule)
+        opts.toggled.connect(self.redraw)
+        return opts
 
-        layers = QGroupBox("Layers and lines")
-        grid = QVBoxLayout(layers)
-        self.checks: dict[str, QCheckBox] = {}
-        names = {k: k for k in LAYERS}
-        names.update(
-            ordinary="Ordinary income tax",
-            ss="Social Security phase-in",
-            senior="Senior deduction phase-out",
-            cg="Capital gains / QD tax",
-            niit="NIIT",
-            state="State tax",
-            state_cg="State CG & QD tax",
-            edu="Education credit phase-out",
-            ptc="ACA premium tax credit phase-out",
-            nonref="Nonrefundable credit absorbing tax",
-        )
-        names.update(ANNOTATION_LABELS)
-        tips = {
-            "edu": "Education credits lost as MAGI rises through their phase-out\n"
-                   "(American Opportunity and Lifetime Learning).",
-            "ptc": "ACA premium subsidy lost on each extra dollar below the 400%\n"
-                   "cliff. A premium rather than a tax, but it costs the same.\n"
-                   "Needs a benchmark premium in the profile. The cliff itself is\n"
-                   "the ACA line, labelled with the subsidy lost there.",
-            "nonref": "Drawn below 0%: tax that an unused nonrefundable credit\n"
-                      "cancels, so the total stays at 0% until the credit is used up.",
-        }
-        for key in [*LAYERS, *ANNOTATIONS]:
-            cb = QCheckBox(names[key])
-            if key in tips:
-                cb.setToolTip(tips[key])
-            cb.clicked.connect(lambda checked, k=key: self._user_toggled(k, checked))
-            self.checks[key] = cb
-            grid.addWidget(cb)
-        reset = QPushButton("&Reset to suggested")
-        reset.setToolTip("Go back to the layers suggested by the profile")
-        reset.clicked.connect(self._reset_visibility)
-        grid.addWidget(reset, 0, Qt.AlignmentFlag.AlignLeft)
-        lay.addWidget(layers)
-        lay.addStretch(1)
-
-        self.source.currentIndexChanged.connect(self._schedule)
-        self.x_max.valueChanged.connect(self._schedule)
-        self.irmaa_basis.currentIndexChanged.connect(self._schedule)
-        return box
+    @property
+    def overrides(self) -> dict[str, bool]:
+        """The user's explicit layer choices."""
+        return self.graph_options.overrides
 
     def _page_changed(self, index: int) -> None:
         self.options_stack.setCurrentIndex(index)
@@ -811,8 +707,7 @@ class MainWindow(QMainWindow):
         self._timer.start()
 
     def _user_toggled(self, key: str, checked: bool) -> None:
-        self.overrides[key] = checked
-        self.redraw()
+        self.graph_options._user_toggled(key, checked)
 
     def _reset_visibility(self) -> None:
         self.overrides.clear()
@@ -820,9 +715,7 @@ class MainWindow(QMainWindow):
 
     def visibility(self) -> dict[str, bool]:
         assert self.series is not None
-        vis = default_visibility(self.series)
-        vis.update(self.overrides)
-        return vis
+        return self.graph_options.visibility(self.series)
 
     def recompute(self) -> None:
         profile = self.form.profile()
@@ -831,36 +724,11 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage("; ".join(problems))
             return
         try:
-            self.series = build_marginal_series(
-                profile,
-                self.library,
-                source=IncomeSource(self.source.currentData()),
-                x_max=self.x_max.value(),
-                step=max(100.0, self.x_max.value() / 2500),
-                irmaa_basis=self.irmaa_basis.currentData(),
-            )
+            self.series = compute_series(profile, self.library, self.graph_options)
         except (KeyError, ValueError) as exc:
             self.statusBar().showMessage(f"Cannot compute: {exc}")
             return
-        state_cb = self.checks["state"]
-        state_cb.setText(self.series.state.label if self.series.state else "State tax")
-        state_cb.setEnabled(self.series.state is not None)
-        st = self.series.state
-        state_cb.setEnabled(st is not None and st.has_state_layer)
-        cg_cb = self.checks["state_cg"]
-        cg_cb.setText(st.gains_label if st else "State CG & QD tax")
-        cg_cb.setEnabled(st is not None and st.has_separate_gains_tax)
-        cg_cb.setToolTip(
-            "Tax under the state's own capital gains rules (Washington's gains\n"
-            "tax, Montana's gains rates, Hawaii's gains rate cap). Where a state\n"
-            "taxes gains as regular income, that tax is in the State Tax layer."
-        )
-        state_cb.setToolTip(
-            # State notes and sources come from the data files: wrap them to the tooltip width.
-            "\n".join(textwrap.fill(line, TIP_WIDTH, subsequent_indent="  ") for line in
-                      [f"{st.name} ({st.year or ''})", *st.notes, *(f"Source: {x}" for x in st.sources)])
-            if st else "Choose a state in the profile to add this layer."
-        )
+        self.graph_options.show_state(self.series)
         self.redraw()
         if self.plan_view.plan is not None:
             self.plan_view.recompute(profile)
@@ -876,42 +744,12 @@ class MainWindow(QMainWindow):
         if self.series is None:
             return
         vis = self.visibility()
-        for key, cb in self.checks.items():
-            cb.blockSignals(True)
-            cb.setChecked(vis.get(key, False))
-            cb.blockSignals(False)
-        render_marginal(self.figure, self.series, vis, self.theme.palette(self.effective_mode))
-        self.canvas.draw_idle()
+        self.graph_options.sync_checks(vis)
+        self.chart.show(self.series, vis, self.theme.palette(self.effective_mode))
         self.plan_view.set_palette(self.theme.palette(self.effective_mode))
-        self._fill_table(vis)
 
     def _fill_table(self, vis: dict[str, bool]) -> None:
-        s = self.series
-        assert s is not None
-        shown = [k for k in LAYERS if vis.get(k)]
-        rows: list[tuple[float, str, str]] = []
-        prev = None
-        # Exact thresholds rather than chart steps, so no row shows a blend
-        # of the rates on either side of a threshold.
-        for bp in s.breakpoints():
-            total = round(sum(bp.rates[k] for k in shown), 4)
-            if prev is None or abs(total - prev) > 1e-4:
-                parts = [
-                    f"{s.layer_label(k)} {bp.rates[k]:.1%}" for k in shown if abs(bp.rates[k]) > 1e-6
-                ]
-                rows.append((bp.x, f"{total:.1%}", ", ".join(parts)))
-                prev = total
-        for a in s.annotations:
-            if vis.get(a.kind):
-                rows.append((a.x, "", a.detail))
-        rows.sort(key=lambda r: r[0])
-        self.table.setRowCount(len(rows))
-        for r, (x, rate, what) in enumerate(rows):
-            for c, text in enumerate((f"${x:,.0f}", rate, what)):
-                item = QTableWidgetItem(text)
-                if c < 2:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.table.setItem(r, c, item)
+        self.chart.fill_table(self.series, vis)
 
     def set_theme_mode(self, mode: str) -> None:
         """View > System theme, Light mode or Dark mode: remembered, and the
