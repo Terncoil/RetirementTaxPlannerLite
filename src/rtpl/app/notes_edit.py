@@ -105,6 +105,7 @@ class NotesEdit(QWidget):
         self.text.setAcceptRichText(False)  # paste as plain text
         self.text.setTabChangesFocus(True)  # except in a list, where Tab indents
         self.text.installEventFilter(self)
+        self._set_indent_width()
         self.style = QComboBox()
         self.style.addItems(STYLES)
         self.style.setAccessibleName("Paragraph style")
@@ -331,9 +332,20 @@ class NotesEdit(QWidget):
         self.numbers.defaultAction().setChecked(style == NUMBERED)
 
     # -- text -------------------------------------------------------------
+    def _set_indent_width(self) -> None:
+        """Each list level indents about two characters (Qt's default is 40
+        pixels), leaving room for the bullet or a number such as "10."."""
+        self.text.document().setIndentWidth(self.text.fontMetrics().horizontalAdvance("00") + 4)
+
+    def changeEvent(self, event: QEvent) -> None:
+        if event.type() == QEvent.Type.FontChange:
+            self._set_indent_width()
+        super().changeEvent(event)
+
     def set_markdown(self, text: str) -> None:
         self._loading = True
         self.text.setMarkdown(text)
+        self._set_indent_width()
         self._loading = False
         self._sync_toolbar()
 
