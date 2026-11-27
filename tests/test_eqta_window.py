@@ -63,7 +63,7 @@ def test_new_file_has_this_years_tab(win):
     assert win.windowTitle().startswith("Untitled[*]")
     tree = win.editor.tree
     assert [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())] == [
-        "Profile", "Notes", "Payments", "Income and deductions"]
+        "Profile", "File notes", "Year notes", "Payments", "Income and deductions"]
 
 
 def test_worksheet_rows(win):
@@ -346,3 +346,36 @@ def test_file_opens_at_this_years_tab():
     assert default_year(eq, dt.date(2026, 11, 26)).year == 2026
     assert default_year(eq, dt.date(2030, 1, 5)).year == 2027  # no tab for this year: the newest
     assert default_year(EqtaFile()) is None
+
+
+def test_file_and_year_notes_keep_bold_and_italic_as_markdown(win, tmp_path):
+    from PySide6.QtGui import QTextCursor
+
+    ed = win.editor
+    ed.tree.setCurrentItem(ed._find(("file_notes", None)))
+    page = ed.file_notes_page
+    assert ed.stack.currentWidget() is page
+    page.text.setPlainText("Keep the HSA receipts")
+    cur = page.text.textCursor()
+    cur.movePosition(QTextCursor.MoveOperation.Start)
+    cur.movePosition(QTextCursor.MoveOperation.EndOfWord, QTextCursor.MoveMode.KeepAnchor)
+    page.text.setTextCursor(cur)
+    page.edit.bold.defaultAction().trigger()
+    assert win.eq.notes == "**Keep** the HSA receipts"
+    ed.tree.setCurrentItem(ed._find(("notes", None)))
+    ed.notes_page.edit.set_markdown("")
+    ed.notes_page.text.setPlainText("Convert in *December*")
+    ty = win.current_year()
+    saved = ty.notes
+    assert saved.startswith("Convert in \\*")  # typed asterisks stay literal
+    assert win.isWindowModified()
+    ed.notes_page.set_target(ty)  # opening the page changes nothing
+    assert ty.notes == saved and ed.notes_page.text.toPlainText() == "Convert in *December*"
+    path = tmp_path / "n.eqta"
+    win.eq.save(path)
+    back = EqtaFile.load(path)
+    assert back.notes == "**Keep** the HSA receipts"
+    # The file notes show the same text under another year's tree.
+    ed.tree.setCurrentItem(ed._find(("profile", None)))
+    ed.tree.setCurrentItem(ed._find(("file_notes", None)))
+    assert page.text.toPlainText() == "Keep the HSA receipts"

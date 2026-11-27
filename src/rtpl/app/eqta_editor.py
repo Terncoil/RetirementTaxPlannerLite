@@ -1,6 +1,6 @@
 """The EQTA window's left panel: a tree of the year's items and an editor.
 
-The tree has fixed Profile, Notes and Payments nodes, then the income
+The tree has fixed Profile, File notes, Year notes and Payments nodes, then the income
 sources grouped by tax type. Below it is the form for the selected item
 and, for income sources and payment lines, its register of date and
 amount rows. Every change is written straight into the year and announced
@@ -13,7 +13,18 @@ import datetime as dt
 import textwrap
 
 from PySide6.QtCore import QDate, Qt, Signal
-from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPalette, QPen, QPixmap
+from PySide6.QtGui import (
+    QAction,
+    QBrush,
+    QColor,
+    QFont,
+    QIcon,
+    QPainter,
+    QPalette,
+    QPen,
+    QPixmap,
+    QTextCharFormat,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -36,6 +47,7 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
+    QTextEdit,
     QToolButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -464,29 +476,115 @@ class ProfilePage(QWidget):
         self.changed.emit()
 
 
-class NotesPage(QWidget):
+class NotesEdit(QWidget):
+    """A notes box with simple formatting (bold and italic), kept as Markdown.
+
+    Qt reads and writes the Markdown itself (``QTextDocument.setMarkdown``
+    and ``toMarkdown``), so this needs nothing beyond PySide6. Pasted text
+    arrives plain; Ctrl+B and Ctrl+I, or the buttons, format the selection.
+    """
+
     changed = Signal()
 
-    def __init__(self) -> None:
+    def __init__(self, name: str, placeholder: str) -> None:
         super().__init__()
-        self.ty: TaxYear | None = None
-        self.text = QPlainTextEdit()
-        self.text.setAccessibleName("Year notes")
-        self.text.setPlaceholderText("Notes for this year, such as the inherited IRA withdrawal plan.")
+        self.text = QTextEdit()
+        self.text.setAccessibleName(name)
+        self.text.setPlaceholderText(placeholder)
+        self.text.setAcceptRichText(False)  # paste as plain text
+        self.text.setTabChangesFocus(True)
+        bar = QHBoxLayout()
+        bar.setContentsMargins(0, 0, 0, 0)
+        self.bold = self._button("B", "Bold (Ctrl+B)", "Ctrl+B", self._set_bold)
+        self.italic = self._button("I", "Italic (Ctrl+I)", "Ctrl+I", self._set_italic)
+        f = self.bold.font()
+        f.setBold(True)
+        self.bold.setFont(f)
+        f = self.italic.font()
+        f.setItalic(True)
+        self.italic.setFont(f)
+        bar.addWidget(self.bold)
+        bar.addWidget(self.italic)
+        bar.addStretch(1)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(QLabel("Notes for this year"))
+        lay.addLayout(bar)
         lay.addWidget(self.text, 1)
-        self.text.textChanged.connect(self._store)
+        self._loading = False
+        self.text.textChanged.connect(self._changed)
+        self.text.currentCharFormatChanged.connect(self._format_changed)
 
-    def set_year(self, ty: TaxYear) -> None:
-        self.ty = None
-        self.text.setPlainText(ty.notes)
-        self.ty = ty
+    def _button(self, text: str, tip: str, keys: str, slot) -> QToolButton:
+        action = QAction(text, self.text, checkable=True, shortcut=keys, toolTip=tip)
+        action.setShortcutContext(Qt.ShortcutContext.WidgetShortcut)
+        action.triggered.connect(slot)
+        self.text.addAction(action)
+        button = QToolButton()
+        button.setDefaultAction(action)
+        button.setAccessibleName(tip.split(" (")[0])
+        button.setFocusPolicy(Qt.FocusPolicy.NoFocus)  # keep the selection in the text
+        return button
+
+    def _set_bold(self, on: bool) -> None:
+        fmt = QTextCharFormat()
+        fmt.setFontWeight(QFont.Weight.Bold if on else QFont.Weight.Normal)
+        self.text.mergeCurrentCharFormat(fmt)
+
+    def _set_italic(self, on: bool) -> None:
+        fmt = QTextCharFormat()
+        fmt.setFontItalic(on)
+        self.text.mergeCurrentCharFormat(fmt)
+
+    def _format_changed(self, fmt: QTextCharFormat) -> None:
+        self.bold.defaultAction().setChecked(fmt.fontWeight() >= QFont.Weight.Bold)
+        self.italic.defaultAction().setChecked(fmt.fontItalic())
+
+    def set_markdown(self, text: str) -> None:
+        self._loading = True
+        self.text.setMarkdown(text)
+        self._loading = False
+
+    def markdown(self) -> str:
+        return self.text.toMarkdown().strip()
+
+    def _changed(self) -> None:
+        if not self._loading:
+            self.changed.emit()
+
+
+class NotesPage(QWidget):
+    """File notes (for the whole file) or Year notes (for the year's tab)."""
+
+    changed = Signal()
+
+    def __init__(self, scope: str) -> None:
+        super().__init__()
+        self.scope = scope  # "file" or "year"
+        self.target: EqtaFile | TaxYear | None = None
+        if scope == "file":
+            name, heading = "File notes", "Notes for the whole file, shown on every year's tab"
+            hint = "Notes for every year, such as account numbers or a long-term plan."
+        else:
+            name, heading = "Year notes", "Notes for this year"
+            hint = "Notes for this year, such as the inherited IRA withdrawal plan."
+        self.edit = NotesEdit(name, hint)
+        self.text = self.edit.text
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        title = QLabel(heading)
+        title.setWordWrap(True)
+        lay.addWidget(title)
+        lay.addWidget(self.edit, 1)
+        self.edit.changed.connect(self._store)
+
+    def set_target(self, target: EqtaFile | TaxYear) -> None:
+        self.target = None
+        self.edit.set_markdown(target.notes)
+        self.target = target
 
     def _store(self) -> None:
-        if self.ty is not None:
-            self.ty.notes = self.text.toPlainText()
+        if self.target is not None:
+            self.target.notes = self.edit.markdown()
             self.changed.emit()
 
 
@@ -675,12 +773,13 @@ class EqtaEditor(QWidget):
         buttons.addWidget(self.delete_btn)
         buttons.addStretch(1)
         self.profile_page = ProfilePage(states)
-        self.notes_page = NotesPage()
+        self.file_notes_page = NotesPage("file")
+        self.notes_page = NotesPage("year")
         self.item_page = ItemPage()
         self.blank = QLabel("Choose an item above to edit it.")
         self.blank.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.stack = QStackedWidget()
-        for w in (self.blank, self.profile_page, self.notes_page, self.item_page):
+        for w in (self.blank, self.profile_page, self.file_notes_page, self.notes_page, self.item_page):
             self.stack.addWidget(w)
         lay = QVBoxLayout(self)
         lay.setContentsMargins(6, 6, 6, 6)
@@ -689,6 +788,7 @@ class EqtaEditor(QWidget):
         lay.addWidget(self.stack, 1)
         self.profile_page.changed.connect(self._profile_changed)
         self.notes_page.changed.connect(self.changed)
+        self.file_notes_page.changed.connect(self.changed)
         self.item_page.changed.connect(self.changed)
         self.item_page.renamed.connect(self._refresh_labels)
 
@@ -710,7 +810,7 @@ class EqtaEditor(QWidget):
             self._show_page(self.blank)
             return
         fixed = []
-        for text, kind in (("Profile", "profile"), ("Notes", "notes")):
+        for text, kind in (("Profile", "profile"), ("File notes", "file_notes"), ("Year notes", "notes")):
             node = QTreeWidgetItem([text])
             node.setData(0, ROLE, (kind, None))
             fixed.append(node)
@@ -762,8 +862,11 @@ class EqtaEditor(QWidget):
             self.profile_page.set_year(ty)
             self._show_page(self.profile_page)
         elif kind == "notes":
-            self.notes_page.set_year(ty)
+            self.notes_page.set_target(ty)
             self._show_page(self.notes_page)
+        elif kind == "file_notes" and self.eq is not None:
+            self.file_notes_page.set_target(self.eq)
+            self._show_page(self.file_notes_page)
         elif kind == "payment":
             self.item_page.set_item(ty, ty.payments[key], self._state_label())
             self._show_page(self.item_page)
@@ -796,7 +899,7 @@ class EqtaEditor(QWidget):
 
     def _profile_changed(self) -> None:
         # Names and the state appear in the tree's labels.
-        node = self.tree.topLevelItem(2)
+        node = self._find(("payments", None))
         for n, key in enumerate(PAYMENT_LINES):
             node.child(n).setText(0, payment_label(key, self._state_label()))
         it = QTreeWidgetItemIterator(self.tree)

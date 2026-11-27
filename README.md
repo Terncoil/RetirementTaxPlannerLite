@@ -130,14 +130,17 @@ made with the **Year** menu (New, Clone with every amount zeroed,
 Rename/Describe, Delete).
 
 In the Inputs panel, the year's **Profile** (filing status, state, people,
-and last year's tax and AGI for the safe harbor), **Notes**, the four
+and last year's tax and AGI for the safe harbor), **File notes** (one set
+for the whole file, shown under every year) and **Year notes**, the four
 **Payments** lines (federal withholding and EFTPS, the state's withholding
 and estimated payments) and the income sources, grouped by tax type. Each
 source and payment line has an optional annual plan amount, notes and a
 register of dates and amounts; amounts take simple arithmetic such as
 `3662.90*12`, and dates can be typed as MM/DD or picked from the calendar
 button in the date cell. A source with no name shows as its tax type, and
-a source that belongs to someone adds " - " and their name.
+a source that belongs to someone adds " - " and their name. File and
+Year notes take bold and italic (Ctrl+B, Ctrl+I or the B and I buttons)
+and are saved as Markdown.
 
 The **Worksheet** totals each source through March 31, May 31, August 31
 and December 31, plus the Plan column, and shows the estimated tax on that

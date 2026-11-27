@@ -274,7 +274,7 @@ class TaxYear:
     profile: Profile = field(default_factory=lambda: eqta_profile(2026))
     sources: list[IncomeSource] = field(default_factory=list)
     payments: dict[str, PaymentLine] = field(default_factory=_default_payments)
-    notes: str = ""
+    notes: str = ""  # Year notes (Markdown)
     dependents: list[str] = field(default_factory=list)  # names, a tag only for now
     # Last year's tax and AGI for the safe harbor, as typed (None = take
     # them from last year's tab in the same file, if there is one).
@@ -349,6 +349,7 @@ class NewYearDefaults:
 class EqtaFile:
     years: list[TaxYear] = field(default_factory=list)  # newest year first
     defaults: NewYearDefaults = field(default_factory=NewYearDefaults)
+    notes: str = ""  # File notes (Markdown), for the whole file; each year has its own too
     schema_version: int = SCHEMA_VERSION
 
     def year(self, year: int) -> TaxYear | None:
@@ -389,6 +390,7 @@ class EqtaFile:
             "kind": FILE_KIND,
             "schema_version": self.schema_version,
             "defaults": self.defaults.to_dict(),
+            "notes": self.notes,
             "years": [y.to_dict() for y in self.years],
         }
 
@@ -399,6 +401,7 @@ class EqtaFile:
         years = [TaxYear.from_dict(y) for y in data.get("years", [])]
         years.sort(key=lambda y: y.year, reverse=True)  # newest first, as the tabs show
         return cls(years=years, defaults=NewYearDefaults.from_dict(data.get("defaults", {})),
+                   notes=str(data.get("notes", "")),
                    schema_version=int(data.get("schema_version", SCHEMA_VERSION)))
 
     def save(self, path: str | Path) -> None:
