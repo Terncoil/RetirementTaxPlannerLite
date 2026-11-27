@@ -3,8 +3,8 @@
 One tab per tax year in the open ``.eqta`` file, each with a Worksheet, a
 Calculation detail, and a Marginal chart and data table. The Inputs panel
 on the left edits the current year; the Graph options panel on the right
-holds RTPL's marginal graph options, plus which column the graph draws
-from (the Plan column or the latest YTD column). The window has its own File, Year and View menus; the Window menu
+holds RTPL's marginal graph options, plus which worksheet column the graph
+draws from (YTD Dec 31 unless chosen otherwise). The window has its own File, Year and View menus; the Window menu
 (added by ``rtpl.app.windows``) switches to the RTPL window.
 """
 
@@ -40,11 +40,11 @@ from PySide6.QtWidgets import (
 from rtpl.app import TIP_WIDTH
 from rtpl.app.documents import EQTA_FILTER, EQTA_SUFFIX, WINDOW_EQTA, window_for, with_eqta_suffix
 from rtpl.app.eqta_editor import EqtaEditor
-from rtpl.app.eqta_worksheet import YearPage, money
+from rtpl.app.eqta_worksheet import COLUMN_TITLES, YearPage, money
 from rtpl.app.inputs import ComboBox, SpinBox
 from rtpl.app.marginal_view import MarginalOptions, compute_series
 from rtpl.app.side_panel import PanelHost, SidePanel
-from rtpl.engine.estimated import PLAN, Worksheet, build_profile, compute_worksheet
+from rtpl.engine.estimated import PERIODS, PLAN, Worksheet, build_profile, compute_worksheet
 from rtpl.model.eqta import EqtaFile, NewYearDefaults, TaxYear
 from rtpl.taxlaw.loader import TaxLawLibrary
 from rtpl.theme import Theme
@@ -60,14 +60,6 @@ QUALIFIED_SHARE_NOTE = (
     "parts as estimated. Last year's 1099-DIV, or the fund's own estimate, is a "
     "good guide."
 )
-
-
-def latest_ytd_column(ws: Worksheet, today: dt.date | None = None) -> int:
-    """The latest YTD column whose period has ended: all four for a past
-    year, none yet (the first column) early in the year or for a future one."""
-    today = today or dt.date.today()
-    ended = [i for i, end in enumerate(ws.period_ends) if end <= today]
-    return ended[-1] if ended else 0
 
 
 def default_year(eq: EqtaFile, today: dt.date | None = None) -> TaxYear | None:
@@ -170,11 +162,14 @@ class EqtaWindow(QMainWindow):
         self.inputs_panel = SidePanel("Inputs", self.editor, Qt.Edge.LeftEdge)
         self.graph_options = MarginalOptions()
         self.draw_from = ComboBox()
-        self.draw_from.addItem("Plan column", "plan")
-        self.draw_from.addItem("Latest YTD column", "ytd")
+        for i, title in enumerate(COLUMN_TITLES):
+            self.draw_from.addItem(title, i)
+        self.draw_from.setCurrentIndex(PERIODS - 1)  # YTD Dec 31: the whole year's registers
         self.draw_from.setAccessibleName("Draw the graph from")
-        self.draw_from.setToolTip("The income the graph starts from: the plan amounts, or the\n"
-                                  "year-to-date totals of the latest period that has ended.")
+        self.draw_from.setToolTip("The worksheet column whose income the graph starts from.\n"
+                                  "YTD Dec 31 counts every register entry for the year, dated\n"
+                                  "ahead included, so the data table shows the room left to\n"
+                                  "each bracket edge and cliff by year end.")
         from_label = QLabel("Draw &from")
         from_label.setBuddy(self.draw_from)
         self.graph_options.form.insertRow(0, from_label, self.draw_from)
@@ -463,8 +458,8 @@ class EqtaWindow(QMainWindow):
             return
         page.show_worksheet(ws)
         self.worksheet = ws
-        col = latest_ytd_column(ws)
-        self.draw_from.setItemText(1, f"Latest YTD column ({page.worksheet.horizontalHeaderItem(col + 1).text()})")
+        for i in range(self.draw_from.count()):  # the dates follow the year
+            self.draw_from.setItemText(i, page.worksheet.horizontalHeaderItem(i + 1).text())
         page.graph_dirty = True
         if page.showing_graph():
             self._graph_timer.stop()
@@ -483,9 +478,7 @@ class EqtaWindow(QMainWindow):
 
     def graph_column(self) -> int:
         """The worksheet column the graph draws from."""
-        if self.draw_from.currentData() == "plan" or self.worksheet is None:
-            return PLAN
-        return latest_ytd_column(self.worksheet)
+        return int(self.draw_from.currentData())
 
     def update_graph(self) -> None:
         """Build the marginal series for the current year's chosen column."""
@@ -511,7 +504,7 @@ class EqtaWindow(QMainWindow):
             parts.append(f"{ws.state.name} tax {money(b.state_tax)}")
         hint = ""
         if col == PLAN and not any(ws.amounts[PLAN]):
-            hint = " (no plan amounts yet: type some, or draw from the latest YTD column)"
+            hint = " (no plan amounts yet)"
         self.statusBar().showMessage(f"Graph from {what}{hint}: " + ", ".join(parts))
 
     def redraw_graph(self) -> None:

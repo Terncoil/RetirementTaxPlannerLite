@@ -411,10 +411,11 @@ Guidance, dimmed and for information only:
   (California 27/63/63/90). State safe-harbor rules are not modeled yet.
 
 **Marginal chart and data table**: RTPL's marginal graph for the year,
-drawn from either the Plan column or the latest YTD column (the last
-period that has ended: December 31 for a past year). The profile is the
-worksheet's, with each source's amount from that column, so a YTD graph
-shows the rates as if the year ended then. The pieces are shared with the
+drawn from any of the five worksheet columns (Graph options > Draw from),
+YTD Dec 31 by default: every register entry for the year, those dated
+ahead included, so the data table shows the room left to each bracket
+edge and cliff by year end. The profile is the worksheet's, with each
+source's amount from that column. The pieces are shared with the
 RTPL window (`app/marginal_view.py`): `MarginalOptions` is the Graph
 options panel (plus EQTA's Draw from choice), `MarginalChart` the chart
 and its table. A year's chart is computed only while its tab shows, and

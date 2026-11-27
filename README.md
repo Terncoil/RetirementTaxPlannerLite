@@ -151,10 +151,11 @@ period runs to April 30; California's installments are 30/40/0/30).
 Dimmed guidance lines show the annualized method (Form 2210 Schedule AI)
 and the regular safe-harbor installments. **Calculation detail** shows the
 steps behind each column. **Marginal chart** and **Marginal data table**
-are RTPL's marginal graph for the year, drawn from the Plan column or the
-latest YTD column (the **Graph options** panel, Ctrl+2, chooses which and
-holds RTPL's other graph options), to see the room to the next bracket or
-cliff. Whole-dollar amounts round 50 cents up, as the
+are RTPL's marginal graph for the year, drawn from any worksheet column,
+YTD Dec 31 by default (the **Graph options** panel, Ctrl+2, chooses which
+and holds RTPL's other graph options). With entries for what is still to
+come this year, the data table shows the room left to each bracket edge
+and cliff by year end. Whole-dollar amounts round 50 cents up, as the
 IRS does; the calculations keep the cents. See "Estimated Quarterly Tax Assistant" in
 [docs/design.md](docs/design.md).
 
