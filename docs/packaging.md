@@ -47,6 +47,28 @@ uv run --with pyinstaller pyinstaller packaging/rtpl.spec --noconfirm
 | macOS | `dist/RetirementTaxPlannerLite.app` | In the bundle, so Finder, Dock and Launchpad show it |
 | Linux | `dist/RetirementTaxPlannerLite/RetirementTaxPlannerLite` | Linux programs carry no icon; `sh packaging/linux/install.sh` installs the build with a menu entry and icons |
 
+### Why the first start is slow
+
+The builds are PyInstaller *one-folder* apps: the program and a few hundred
+library files (Python, Qt, matplotlib, NumPy) sit unpacked in one folder,
+so nothing is extracted at start-up. The first start after a download is
+still several times slower than later ones, for reasons outside the app:
+
+* **Security scanning.** The builds are not code-signed. Windows Defender
+  (and SmartScreen, for a downloaded file) checks each new `.exe` and DLL
+  the first time it loads, and macOS Gatekeeper and XProtect check a new
+  `.app` before it starts ("Verifying..."). The results are remembered, so
+  later starts skip this.
+* **Cold disk cache.** The first read of every library file comes from the
+  disk; later starts find most of them in memory.
+* **matplotlib's font list.** On its first run matplotlib scans the
+  computer's fonts and saves the list (`fontlist-*.json` in its config
+  folder). A computer with many fonts takes longer.
+
+None of this downloads anything or compiles code; the Python code ships
+already compiled. Signing the builds would shorten the Windows and macOS
+checks but not remove them. The README tells people to expect it.
+
 ## File types
 
 Profiles and plans are saved as `.rtpl` files (JSON inside); older `.json`

@@ -66,6 +66,13 @@ Linux, see [docs/packaging.md](docs/packaging.md). Ready-made builds are on
 the Releases page for each version, and GitHub builds fresh ones after every
 change to `main`.
 
+> **The first start is slow.** The first time a downloaded build opens, it
+> can take several times longer than usual before the window appears.
+> Your security software is checking the program's files, and the
+> charting library is making a list of the fonts on your computer. Both happen once: later starts are quick. The
+> same can happen once after you install a new version. Give it time
+> rather than double-clicking again, which would only start a second copy.
+
 ## What's in the box
 
 * Profile editor: tax year, filing status, state, one or two people
